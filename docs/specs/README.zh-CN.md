@@ -64,7 +64,7 @@ $ tbg --agent hopeful_morse topic list --group <group>
 
 新 Agent 没有默认订阅。只有显式 subscribe 后才能接收 Topic 消息，新订阅默认 unmute。发送不要求订阅，也不会自动建立订阅。default topic 暂时预留。
 
-Topic 是共享对话空间。Reply 保留回应关系，@ 表达希望谁关注，两者都不改变消息对订阅者的可见性。静音只影响 wait 的提醒，消息仍可主动读取。
+Topic 是共享对话空间。Reply 保留回应关系，@ 表达希望谁关注，两者都不改变消息对订阅者的可见性。静音只影响 wait 的提醒：静音时，仅明确 @ 当前 Agent 的消息触发 wait，其他消息仍可主动读取。
 
 每条消息对外使用一个稳定的 `msg_id`，由 send 返回，并在 history 中展示。引用、读取起点、订阅起点和 ack 使用同一消息标识，不再要求 Agent 管理另一套 position 或 offset。history 的 `--from` 包含指定消息，`--after` 不包含指定消息；ack 的 `--through` 包含指定消息；`--quote` 指向被回复的消息。
 
