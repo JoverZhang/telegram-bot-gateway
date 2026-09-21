@@ -148,7 +148,7 @@ User 在 Topic 中发言、Reply 或 @ Agent。查询与管理统一从 `/manage
 
 | 文件 | 职责 |
 |---|---|
-| `communication.zh-CN.md`（待编写） | Agent CLI 与 Telegram User 的通信场景：订阅、发送、读取、ack、wait、Reply/@、暂离与恢复。 |
+| [communication.zh-CN.md](communication.zh-CN.md)（大纲，待细化） | Agent CLI 与 Telegram User 的通信场景：订阅、发送、读取、ack、wait、Reply/@、暂离与恢复。 |
 | `operations.zh-CN.md`（待编写） | 注册与身份、Bot 配置、User 信任、Group/Topic 管理、菜单交互、Doctor、状态及语言设置。 |
 
 本轮先收敛 CLI 操作与 Telegram 交互。CLI → Gateway → Telegram 的职责、传输方式和状态存储留给后续架构文档。历史检索与 Checkpoint 暂不设计。
