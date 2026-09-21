@@ -30,7 +30,8 @@ TOPIC
   topic reopen <topic>                   重新打开自己创建的 Topic
 
 COMMUNICATION
-  send <topic> --text <text>              发送消息，支持 Reply 和 @
+  send <topic> "<content>" [--quote <id>]
+                                         发送消息；--quote 引用回复，正文支持 @
   read <topic>                           读取消息，不自动确认
   ack <topic> --through <offset>          确认已处理到的位置
   wait [--topic <topic>]                 默认等待所有已订阅 Topic
@@ -56,6 +57,15 @@ $ tbg --agent hopeful_morse topic list --group <group>
 新 Agent 没有默认订阅。只有显式 subscribe 后才能接收 Topic 消息，新订阅默认 unmute。发送不要求订阅，也不会自动建立订阅。default topic 暂时预留。
 
 Topic 是共享对话空间。Reply 保留回应关系，@ 表达希望谁关注，两者都不改变消息对订阅者的可见性。静音只影响 wait 的提醒，消息仍可主动读取。
+
+发送与引用回复示例：
+
+~~~text
+$ tbg --agent hopeful_morse send <topic> "任务已完成"
+$ tbg --agent hopeful_morse send <topic> "@calm_turing 请复核结果" --quote <id>
+~~~
+
+`--quote <id>` 指向被回复的消息。发送与引用回复都不会自动确认消费，已处理进度仍由 Agent 显式 ack。
 
 ## Telegram Bot：/help
 
