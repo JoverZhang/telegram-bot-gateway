@@ -8,7 +8,7 @@ Agent 使用 `tbg` CLI，User 使用 Telegram Bot。本文汇总两个入口的�
 
 `tbg` 专供 Agent 使用。Agent 自助注册，获得自动生成的唯一名称；后续携带该名称操作。Agent 的内部 ID 不作为使用者需要管理的标识。同一名称在不同 CLI 中共享订阅、静音设置和 ack 进度，不同 Agent 的消费进度各自独立。
 
-~~~text
+```text
 tbg — Telegram Bot Gateway
 
 USAGE
@@ -50,17 +50,17 @@ SUBSCRIPTION
   subscriptions                         查看订阅、已确认消息 ID 和首条待确认消息 ID
   mute <topic> [--off]                   开启静音；--off 取消静音
   unsubscribe <topic>                    停止订阅，保留进度
-~~~
+```
 
 注册示例：
 
-~~~text
+```text
 $ tbg agent register
 hopeful_morse
 
 $ tbg --agent hopeful_morse group list
 $ tbg --agent hopeful_morse topic list --group <group>
-~~~
+```
 
 新 Agent 没有默认订阅。只有显式 subscribe 后才能接收 Topic 消息，新订阅默认 unmute。发送不要求订阅，也不会自动建立订阅。default topic 暂时预留。
 
@@ -74,7 +74,7 @@ history 支持用 `--limit` 限制单次返回的条数。`last_msg_id` 是本�
 
 以下示例假设 Agent 已订阅该 Topic。User 后续更正了要求，Agent 读完两批消息后才回复：
 
-~~~text
+```text
 $ tbg --agent hopeful_morse subscriptions
 topic: <topic>
 last_acked_msg_id: m41
@@ -96,7 +96,7 @@ $ tbg --agent hopeful_morse send <topic> "测试已通过，未发布" --quote m
 msg_id: m45
 
 $ tbg --agent hopeful_morse ack <topic> --through m44
-~~~
+```
 
 发送、引用回复和读取历史都不会自动确认消费，已处理进度仍由 Agent 显式 ack。Agent 确认到实际读取并处理完的末条消息，后续新到的消息仍待确认。history 的读取范围只影响本次调用，不会重置订阅进度。
 
@@ -106,22 +106,22 @@ $ tbg --agent hopeful_morse ack <topic> --through m44
 
 User 在 Topic 中发言、Reply 或 @ Agent。查询与管理统一从 `/manage` 进入，通过按钮操作；菜单根据当前位置和 User 权限展示可用能力。
 
-~~~text
+```text
 /help       查看使用帮助
 /whoami     查看自己的 Telegram user_id 和身份
 /manage     打开当前位置的查询与管理菜单
-~~~
+```
 
 菜单始终提示当前位置与操作范围。例如在 Topic 内打开：
 
-~~~text
+```text
 当前位置：Group「项目协作」→ Topic「设计讨论」
 操作范围：当前 Topic
-~~~
+```
 
 管理员在与 Bot 的私聊中可以进入全局管理。以下是完整能力目录；Topic 内的菜单按当前范围提供相关操作。
 
-~~~text
+```text
 /manage
 ├─ 状态总览
 ├─ Agent
@@ -136,7 +136,7 @@ User 在 Topic 中发言、Reply 或 @ Agent。查询与管理统一从 `/manage
 └─ 个人设置
    └─ 语言
       └─ [跟随 Telegram] [简体中文] [English]
-~~~
+```
 
 子页面提供返回按钮，筛选通过按钮更新列表。User 分为管理员和普通可信 User：管理员管理信任名单、Group 接入与全部 Topic；普通可信 User 参与对话、查看相关状态。
 
