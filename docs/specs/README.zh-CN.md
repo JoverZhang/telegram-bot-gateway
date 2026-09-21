@@ -30,19 +30,19 @@ TOPIC
   topic reopen <topic>                   重新打开自己创建的 Topic
 
 COMMUNICATION
-  send <topic> "<content>" [--quote <message_id>]
+  send <topic> "<content>" [--quote <msg_id>]
                                          发送消息；--quote 引用回复，正文支持 @
   history <topic>                        读取消息历史，不自动确认
-  history <topic> --from <message_id> [--limit <n>]
+  history <topic> --from <msg_id> [--limit <n>]
                                          从指定消息开始读取，包含该消息
-  history <topic> --after <message_id> [--limit <n>]
+  history <topic> --after <msg_id> [--limit <n>]
                                          读取指定消息之后的历史，不包含该消息
   history <topic> --tail <n>              读取最近 n 条消息
-  ack <topic> --through <message_id>      累计确认到该消息，包含该消息
+  ack <topic> --through <msg_id>          累计确认到该消息，包含该消息
   wait [--topic <topic>]                 默认等待所有已订阅 Topic
 
 SUBSCRIPTION
-  subscribe <topic> [--after <message_id>] [--muted]
+  subscribe <topic> [--after <msg_id>] [--muted]
                                          从指定消息之后订阅，或恢复原订阅
   subscribe <topic> --from <beginning|end> [--muted]
                                          从头订阅，或只接收后续新消息
@@ -66,34 +66,34 @@ $ tbg --agent hopeful_morse topic list --group <group>
 
 Topic 是共享对话空间。Reply 保留回应关系，@ 表达希望谁关注，两者都不改变消息对订阅者的可见性。静音只影响 wait 的提醒，消息仍可主动读取。
 
-每条消息对外使用一个稳定的 `message_id`，由 send 返回，并在 history 中展示。引用、读取起点、订阅起点和 ack 使用同一消息标识，不再要求 Agent 管理另一套 position 或 offset。history 的 `--from` 包含指定消息，`--after` 不包含指定消息；ack 的 `--through` 包含指定消息；`--quote` 指向被回复的消息。
+每条消息对外使用一个稳定的 `msg_id`，由 send 返回，并在 history 中展示。引用、读取起点、订阅起点和 ack 使用同一消息标识，不再要求 Agent 管理另一套 position 或 offset。history 的 `--from` 包含指定消息，`--after` 不包含指定消息；ack 的 `--through` 包含指定消息；`--quote` 指向被回复的消息。
 
-subscriptions 为每个订阅返回 `last_acked_message_id` 和 `first_pending_message_id`，后者是首条待确认消息的位置，没有待确认消息时为 null。Agent 根据这个位置调用 history 读取该消息及后续对话；history 按 Topic 中的消息顺序返回，不按是否已确认、是否被 @ 或是否静音过滤内容。
+subscriptions 为每个订阅返回 `last_acked_msg_id` 和 `first_pending_msg_id`，后者是首条待确认消息的位置，没有待确认消息时为 null。Agent 根据这个位置调用 history 读取该消息及后续对话；history 按 Topic 中的消息顺序返回，不按是否已确认、是否被 @ 或是否静音过滤内容。
 
-history 支持用 `--limit` 限制单次返回的条数。`last_message_id` 是本次返回的末条消息 ID，`has_more` 表示查询时其后是否还有可继续读取的消息。Agent 应先读完后续上下文再决定如何回应；若 `has_more` 为 true，使用 `--after <last_message_id>` 继续读取，避免遗漏后续补充或更正。
+history 支持用 `--limit` 限制单次返回的条数。`last_msg_id` 是本次返回的末条消息 ID，`remaining_count` 是本次查询时该消息之后尚未返回的消息数量，不包含本次返回的消息。0 表示本次查询已返回到末尾，之后新到的消息在下次查询时体现。Agent 应先读完后续上下文再决定如何回应；若 `remaining_count` 大于 0，使用 `--after <last_msg_id>` 继续读取，避免遗漏后续补充或更正。
 
 以下示例假设 Agent 已订阅该 Topic。User 后续更正了要求，Agent 读完两批消息后才回复：
 
 ~~~text
 $ tbg --agent hopeful_morse subscriptions
 topic: <topic>
-last_acked_message_id: m41
-first_pending_message_id: m42
+last_acked_msg_id: m41
+first_pending_msg_id: m42
 
 $ tbg --agent hopeful_morse history <topic> --from m42 --limit 2
 [m42] User: 请发布最新版本
 [m43] User: 更正，先不要发布
-last_message_id: m43
-has_more: true
+last_msg_id: m43
+remaining_count: 1
 
 $ tbg --agent hopeful_morse history <topic> --after m43 --limit 20
 [m44] User: 只运行测试并报告结果
-last_message_id: m44
-has_more: false
+last_msg_id: m44
+remaining_count: 0
 
 # Agent 按最新要求完成测试，再回复并确认这批消息。
 $ tbg --agent hopeful_morse send <topic> "测试已通过，未发布" --quote m44
-message_id: m45
+msg_id: m45
 
 $ tbg --agent hopeful_morse ack <topic> --through m44
 ~~~
