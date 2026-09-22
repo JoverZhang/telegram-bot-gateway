@@ -8,31 +8,25 @@ Topic 中的普通对话对参与者共享。每个 Agent 独立管理订阅和�
 
 ## 订阅、退出与恢复
 
-首次订阅必须显式选择一个起点。四种起点互斥，新订阅默认不静音；`--muted` 可以在订阅时开启静音。
+`subscribe` 管理对 Topic 的订阅，不提供历史读取范围参数。首次订阅从订阅生效后的新消息开始消费，新订阅默认不静音；`--muted` 可以在订阅时开启静音。
 
 ```text
-tbg --agent <name> subscribe <topic> --from beginning [--muted]
-tbg --agent <name> subscribe <topic> --from end [--muted]
-tbg --agent <name> subscribe <topic> --after <msg_id> [--muted]
-tbg --agent <name> subscribe <topic> --tail <n> [--muted]
+tbg --agent <name> subscribe <topic> [--muted]
 ```
 
-| 起点 | 消费范围 |
-|---|---|
-| `--from beginning` | 从首条 CLI 可见的对话消息开始。 |
-| `--from end` | 从订阅时的对话末尾开始，只处理之后到达的消息。 |
-| `--after <msg_id>` | 从指定消息之后开始，不包含该消息。 |
-| `--tail <n>` | 从订阅时最近 n 条 CLI 可见的对话消息开始；不足 n 条时包含全部。 |
-
-选择起点会建立初始消费边界，起点之前的消息被跳过。`last_acked_msg_id` 表示这个边界，初始值是所选范围之前的末条对话消息 ID；没有前一条时为 null。建立边界不表示 Agent 逐条处理过被跳过的历史。之后只有显式 ack 能向前推进边界。
+首次订阅生效时，以当时最新的 CLI 可见对话消息建立初始消费边界；`last_acked_msg_id` 初始为该消息 ID，尚无对话消息时为 null。订阅前的历史不进入初始待确认范围，仍可通过 `history` 读取。这个初始值不表示 Agent 处理过此前的历史，之后只有显式 ack 能向前推进边界。
 
 ```text
-# 该 Agent 从未订阅这个 Topic。
+# 该 Agent 从未订阅这个 Topic，当前最新对话消息为 m41。
 $ tbg --agent hopeful_morse subscribe <topic>
-错误：首次订阅需要指定 --from、--after 或 --tail。
 
-# m41 是该 Topic 中已有的对话消息。
-$ tbg --agent hopeful_morse subscribe <topic> --after m41
+$ tbg --agent hopeful_morse subscriptions
+topic: <topic>
+last_acked_msg_id: m41
+first_pending_msg_id: null
+
+$ tbg --agent hopeful_morse history <topic> --tail 20
+# 回看包括 m41 在内的最近对话，包含订阅前的消息，不改变消费边界。
 
 # 随后 User 发来 m42。
 $ tbg --agent hopeful_morse subscriptions
@@ -47,7 +41,7 @@ $ tbg --agent hopeful_morse subscribe <topic>
 # 恢复原订阅；从保存的边界继续，包含离开期间到达的消息。
 ```
 
-已有订阅再次执行 `subscribe <topic>` 保持原进度；恢复订阅时也省略起点。起点参数只用于首次订阅，对已有记录再次传入任何起点参数都会报错，原进度保持不变。系统不提供 `--reset`。回看早期消息使用只读的 `history`。
+已有订阅再次执行 `subscribe <topic>` 保持原进度；退出后恢复也沿用保存的边界，不重新跳到最新消息。系统不提供 `--reset`。回看早期消息使用只读的 `history`。
 
 恢复时保留原静音设置；显式 `--muted` 开启静音，`mute <topic> --off` 取消静音。没有订阅时仍可发送和读取历史，这些操作不会自动建立订阅。`ack`、`mute` 和指定 Topic 的 `wait` 要求该 Topic 当前已订阅。
 
@@ -60,17 +54,19 @@ $ tbg --agent hopeful_morse subscribe <topic>
 | `last_acked_msg_id` | 当前消费边界；尚无边界消息时为 null。 |
 | `first_pending_msg_id` | 首条待确认消息；没有待确认消息时为 null。 |
 | `last_msg_id` | 本次 history 返回的末条消息；没有返回消息时为 null。 |
+| `next_msg_id` | 同次查询中，紧接本批之后的首条 CLI 可见消息 ID；没有后续消息时为 null。 |
 | `remaining_count` | 查询时，本次 history 末条消息之后尚未返回的 CLI 可见消息数；不含本批消息。 |
 
-`history` 必须显式指定一种读取范围，范围选项互斥。`--from` 包含指定消息，`--after` 不包含指定消息；这两种方式默认最多返回 20 条，可通过 `--limit` 调整。`--tail <n>` 已指定读取条数，不再使用 `--limit`。
+`history` 可读取订阅前后的对话，必须显式选择 `--from` 或 `--tail`，两者互斥。`--from <msg_id>` 包含指定消息及后续对话，默认最多返回 20 条，可通过 `--limit` 调整。`--tail <n>` 读取最近 n 条对话，已指定条数，不再使用 `--limit`。
+
+例如被 @ 后，可用那条消息的 `msg_id` 作为 `--from` 的起点，连同 @ 消息读取后续补充。若 `wait` 返回更早的 `first_pending_msg_id`，应从该位置开始读取，补齐尚未处理的上下文。
 
 ```text
 tbg --agent <name> history <topic> --from <msg_id> [--limit <n>]
-tbg --agent <name> history <topic> --after <msg_id> [--limit <n>]
 tbg --agent <name> history <topic> --tail <n>
 
 $ tbg --agent hopeful_morse history <topic>
-错误：需要指定 --from、--after 或 --tail。
+错误：需要指定 --from 或 --tail。
 ```
 
 以下场景中，Agent 从首条待确认消息开始，读完后续更正才行动：
@@ -85,11 +81,13 @@ $ tbg --agent hopeful_morse history <topic> --from m42 --limit 2
 [m42] User: 请发布最新版本
 [m43] User: 更正，先不要发布
 last_msg_id: m43
+next_msg_id: m44
 remaining_count: 1
 
-$ tbg --agent hopeful_morse history <topic> --after m43
+$ tbg --agent hopeful_morse history <topic> --from m44
 [m44] User: 只运行测试并报告结果
 last_msg_id: m44
+next_msg_id: null
 remaining_count: 0
 
 # Agent 按最新要求完成测试，再回复并确认。
@@ -100,18 +98,23 @@ $ tbg --agent hopeful_morse ack <topic> --through m44
 last_acked_msg_id: m44
 ```
 
-`history` 始终按 Topic 顺序返回对话，包括自己的消息，不按 ack、@ 或静音状态过滤。`remaining_count` 大于 0 时，Agent 使用 `--after <last_msg_id>` 继续读取，读完后续上下文再决定如何回应。0 表示该次查询已到末尾，之后新到的消息会体现在下次查询中；返回结果不预先确认任何消息。
+`history` 始终按 Topic 顺序返回对话，包括自己的消息，不按 ack、@ 或静音状态过滤。`remaining_count` 大于 0 时，`next_msg_id` 给出下一条尚未返回的消息，Agent 使用 `--from <next_msg_id>` 继续读取；即使 `--limit 1`，也能继续前进而不重复边界消息。Agent 读完后续上下文再决定如何回应。
+
+`next_msg_id` 与 `remaining_count` 反映同次查询：数量为 0 时，下一条 ID 为 null；大于 0 时，下一条 ID 非空。它是普通 `msg_id`，不是另一套 offset。之后新到的消息体现在下一次查询或等待中，不改变此前返回的结果。读取不会自动确认任何消息。
 
 ```text
 # 没有订阅也可以回看，结果仍按从早到晚的顺序排列。
 $ tbg --agent hopeful_morse history <topic> --tail 20
-# 最多返回最近 20 条，remaining_count 为 0。
+# 最多返回最近 20 条，next_msg_id 为 null，remaining_count 为 0。
 
-# 对话为空，或 --after 指定的消息已经是末条时：
+# 对话为空时，--tail 返回：
 messages: []
 last_msg_id: null
+next_msg_id: null
 remaining_count: 0
 ```
+
+若 `--from` 指定的消息就是最新一条，仍返回该消息；此时 `next_msg_id` 为 null，`remaining_count` 为 0。
 
 管理命令、Bot 的管理回复及操作结果都持久保存到 DB，但不进入 Agent CLI 的 `history`，也不计入待确认消息或触发 `wait`。例如：
 
@@ -258,7 +261,7 @@ CLI A: Ctrl+C
 CLI A: tbg --agent hopeful_morse wait
        等待当前全部订阅。
 
-CLI B: tbg --agent hopeful_morse subscribe <new-topic> --from end
+CLI B: tbg --agent hopeful_morse subscribe <new-topic>
        new-topic 纳入 CLI A 的等待范围。
 CLI B: tbg --agent hopeful_morse mute <new-topic>
        该 Topic 后续仅明确 @ 当前 Agent 的待确认消息能唤起。
@@ -276,10 +279,11 @@ CLI 或网关重启后，已保存的订阅、静音设置和消费边界保持�
 
 | 场景 | 预期结果 |
 |---|---|
-| 首次订阅缺少起点，或 history 缺少范围 | 报错，提示可选参数；不改变订阅或进度。 |
-| 同时指定互斥的起点或范围 | 报错，不猜测优先级。 |
+| history 缺少读取范围 | 报错，提示选择 `--from` 或 `--tail`；不改变订阅或进度。 |
+| history 同时指定 `--from` 和 `--tail` | 报错，不猜测优先级。 |
+| subscribe 传入历史读取范围参数 | 报错；订阅不接受历史范围。 |
 | `--limit`、`--tail` 不是正整数，或 `--timeout` 不是有效的正数秒数 | 报错；默认持续等待通过省略 `--timeout` 表达。 |
-| `msg_id` 不存在、不属于指定 Topic，或不对 CLI 可见 | 拒绝将其用于读取起点、订阅起点、引用或 ack；进度不变。 |
+| `msg_id` 不存在、不属于指定 Topic，或不对 CLI 可见 | 拒绝将其用于读取起点、引用或 ack；进度不变。 |
 | 对未订阅的 Topic 调用 ack、mute 或指定 Topic 的 wait | 报错，要求先显式订阅。 |
 | 没有任何订阅时调用默认 wait | 报错，提示先订阅。 |
 | Agent 在处理完成但 ack 之前中断 | 消息仍待确认；恢复后可能重新处理，Agent 需考虑工作本身的重复执行。 |

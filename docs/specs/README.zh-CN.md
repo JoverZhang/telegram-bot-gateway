@@ -34,20 +34,13 @@ COMMUNICATION
                                          发送消息；--quote 引用回复，正文支持 @
   history <topic> --from <msg_id> [--limit <n>]
                                          从指定消息开始读取，包含该消息
-  history <topic> --after <msg_id> [--limit <n>]
-                                         读取指定消息之后的历史，不包含该消息
   history <topic> --tail <n>              读取最近 n 条消息
   ack <topic> --through <msg_id>          累计确认到该消息，包含该消息
   wait [--topic <topic>] [--timeout <seconds>]
                                          默认持续等待所有当前订阅，每个 Agent 只允许一个 wait
 
 SUBSCRIPTION
-  subscribe <topic> [--muted]             保持或恢复已有订阅及原进度
-  subscribe <topic> --after <msg_id> [--muted]
-                                         首次订阅，从指定消息之后开始
-  subscribe <topic> --from <beginning|end> [--muted]
-                                         从头订阅，或只接收后续新消息
-  subscribe <topic> --tail <n> [--muted]   从最近 n 条消息开始订阅
+  subscribe <topic> [--muted]             订阅新消息，或恢复已有订阅及原进度
   subscriptions                         查看订阅、已确认消息 ID 和首条待确认消息 ID
   mute <topic> [--off]                   开启静音；--off 取消静音
   unsubscribe <topic>                    停止订阅，保留进度
@@ -63,19 +56,19 @@ $ tbg --agent hopeful_morse group list
 $ tbg --agent hopeful_morse topic list --group <group>
 ```
 
-新 Agent 没有默认订阅。显式 subscribe 建立消费进度和 wait 范围，新订阅默认 unmute。发送和 history 都不要求订阅，也不会自动建立订阅。default topic 暂时预留。
+新 Agent 没有默认订阅。subscribe 管理订阅，首次从订阅生效后的新消息开始消费，新订阅默认 unmute。发送和 history 都不要求订阅，也不会自动建立订阅；history 可以读取订阅前的对话。default topic 暂时预留。
 
 Topic 是共享对话空间。Reply 保留回应关系，@ 表达希望谁关注，两者都不改变消息对订阅者的可见性。静音只影响 wait 的提醒：静音时，仅明确 @ 当前 Agent 的消息触发 wait，其他消息仍可主动读取。
 
 wait 默认持续等待，有符合唤起条件的待确认消息时立即返回，包括调用前已到达的消息。可通过 `--timeout <seconds>` 指定秒数，超时返回空的 topics 列表。每个 Agent 同时只能有一个 wait，第二个调用报错；订阅和静音变化即时影响当前等待，指定 `--topic` 时始终限定在该 Topic。wait 返回满足条件的 Topic 及 `trigger_msg_id`、`first_pending_msg_id`、`pending_count`，正文通过 history 读取；未 ack 的消息仍可再次触发 wait。
 
-每条消息对外使用一个稳定的 `msg_id`，由 send 返回，并在 history 中展示。引用、读取起点、订阅起点和 ack 使用同一消息标识，不再要求 Agent 管理另一套 position 或 offset。history 的 `--from` 包含指定消息，`--after` 不包含指定消息；ack 的 `--through` 包含指定消息；`--quote` 指向被回复的消息。
+每条消息对外使用一个稳定的 `msg_id`，由 send 返回，并在 history 中展示。引用、读取起点和 ack 使用同一消息标识，不再要求 Agent 管理另一套 position 或 offset。history 的 `--from` 包含指定消息及后续对话，可用于定位 @ 所在的消息；ack 的 `--through` 包含指定消息；`--quote` 指向被回复的消息。
 
 subscriptions 为每个订阅返回 `last_acked_msg_id` 和 `first_pending_msg_id`，后者是消费边界之后、由其他参与者发送的首条待确认消息的位置，没有待确认消息时为 null。Agent 根据这个位置调用 history 读取该消息及后续对话；history 按 Topic 中的消息顺序返回，不按是否已确认、是否被 @ 或是否静音过滤内容。自己的消息保留在 history 中，不计入自己的待确认消息，也不唤起自己。
 
 管理命令、Bot 的管理回复和操作结果持久保存到 DB，但不出现在 Agent CLI 的 history 中，也不计入待确认消息或唤起 Agent。
 
-history 必须显式选择 `--from`、`--after` 或 `--tail`，三者互斥。`--from` 和 `--after` 默认最多返回 20 条，可用 `--limit` 调整；`--tail <n>` 已指定条数。`last_msg_id` 是本次返回的末条消息 ID，`remaining_count` 是本次查询时该消息之后尚未返回的 CLI 可见消息数量，不包含本次返回的消息或管理记录。0 表示本次查询已返回到末尾，之后新到的消息在下次查询时体现。Agent 应先读完后续上下文再决定如何回应；若 `remaining_count` 大于 0，使用 `--after <last_msg_id>` 继续读取，避免遗漏后续补充或更正。
+history 必须显式选择 `--from` 或 `--tail`，两者互斥。`--from` 默认最多返回 20 条，可用 `--limit` 调整；`--tail <n>` 读取最近 n 条消息。`last_msg_id` 是本次返回的末条消息 ID，`remaining_count` 是同次查询中其后尚未返回的 CLI 可见消息数量，不包含本批消息或管理记录。`next_msg_id` 指向下一条尚未返回的消息，数量为 0 时为 null。Agent 使用 `--from <next_msg_id>` 继续分页，读完后续上下文再回应；之后新到的消息在下次查询或等待中体现。
 
 以下示例假设 Agent 已订阅该 Topic。User 后续更正了要求，Agent 读完两批消息后才回复：
 
@@ -89,11 +82,13 @@ $ tbg --agent hopeful_morse history <topic> --from m42 --limit 2
 [m42] User: 请发布最新版本
 [m43] User: 更正，先不要发布
 last_msg_id: m43
+next_msg_id: m44
 remaining_count: 1
 
-$ tbg --agent hopeful_morse history <topic> --after m43 --limit 20
+$ tbg --agent hopeful_morse history <topic> --from m44 --limit 20
 [m44] User: 只运行测试并报告结果
 last_msg_id: m44
+next_msg_id: null
 remaining_count: 0
 
 # Agent 按最新要求完成测试，再回复并确认这批消息。
@@ -105,7 +100,7 @@ $ tbg --agent hopeful_morse ack <topic> --through m44
 
 发送、引用回复、读取历史、静音和 wait 都不会自动确认消费，已处理进度仍由 Agent 显式 ack。Agent 确认到实际读取并处理完的末条消息，后续由其他参与者发来的普通对话仍待确认。重复或较旧的 ack 成功返回当前进度，进度不会后退。history 的读取范围只影响本次调用，不会重置订阅进度。
 
-订阅的 `--after`、`--from`、`--tail` 是互斥的起点选择，首次订阅必须显式指定。beginning、end 和最近 n 条只是选择起点的方式，不是另一套消息 ID。已有订阅或退出后恢复时省略起点，保留原进度；再次传入任何起点参数报错，不提供 `--reset`。初始消费边界及恢复场景见[通信规范](communication.zh-CN.md)。
+subscribe 不提供历史范围参数。已有订阅再次调用或退出后恢复时保留原进度，不重新跳到最新消息；不提供 `--reset`。首次订阅的消费边界及恢复场景见[通信规范](communication.zh-CN.md)。
 
 ## Telegram Bot：/help
 

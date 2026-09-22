@@ -8,31 +8,25 @@ Ordinary conversation in a Topic is shared among its participants. Each Agent ma
 
 ## Subscribing, leaving, and resuming
 
-A first subscription requires an explicit starting point. The four choices are mutually exclusive. New subscriptions are unmuted by default; `--muted` enables muting when subscribing.
+`subscribe` manages a Topic subscription and does not accept history range options. A first subscription starts consuming messages that arrive after it takes effect. New subscriptions are unmuted by default; `--muted` enables muting when subscribing.
 
 ```text
-tbg --agent <name> subscribe <topic> --from beginning [--muted]
-tbg --agent <name> subscribe <topic> --from end [--muted]
-tbg --agent <name> subscribe <topic> --after <msg_id> [--muted]
-tbg --agent <name> subscribe <topic> --tail <n> [--muted]
+tbg --agent <name> subscribe <topic> [--muted]
 ```
 
-| Starting point | Consumption range |
-|---|---|
-| `--from beginning` | Start with the first conversation message visible to the CLI. |
-| `--from end` | Start at the end of the conversation at subscription time; process only messages arriving afterward. |
-| `--after <msg_id>` | Start after the specified message, excluding it. |
-| `--tail <n>` | Start with the latest n conversation messages visible to the CLI at subscription time, or all of them if fewer exist. |
-
-Selecting a starting point establishes an initial consumption boundary; earlier messages are skipped. `last_acked_msg_id` represents that boundary. Its initial value is the last conversation message before the selected range, or null if there is no preceding message. Establishing a boundary does not mean the Agent processed the skipped history message by message. Only an explicit ack can advance it afterward.
+When a first subscription takes effect, the latest CLI-visible conversation message establishes its initial consumption boundary. `last_acked_msg_id` starts at that message's ID, or null if the conversation has no messages. Earlier history is outside the initial pending range and remains accessible through `history`. This initial value does not imply that the Agent processed the earlier history. Only an explicit ack can advance the boundary afterward.
 
 ```text
-# This Agent has never subscribed to this Topic.
+# This Agent has never subscribed to this Topic; its latest conversation message is m41.
 $ tbg --agent hopeful_morse subscribe <topic>
-Error: a first subscription requires --from, --after, or --tail.
 
-# m41 is an existing conversation message in this Topic.
-$ tbg --agent hopeful_morse subscribe <topic> --after m41
+$ tbg --agent hopeful_morse subscriptions
+topic: <topic>
+last_acked_msg_id: m41
+first_pending_msg_id: null
+
+$ tbg --agent hopeful_morse history <topic> --tail 20
+# Read recent conversation through m41, including messages before subscribing; the boundary stays unchanged.
 
 # The User then sends m42.
 $ tbg --agent hopeful_morse subscriptions
@@ -47,7 +41,7 @@ $ tbg --agent hopeful_morse subscribe <topic>
 # Resume from the saved boundary, including messages that arrived while away.
 ```
 
-Calling `subscribe <topic>` again preserves an existing subscription's progress. Omit the starting point when resuming as well. Starting-point options are only for a first subscription: supplying any of them for an existing record returns an error and preserves progress. There is no `--reset`. Use read-only `history` to look back at earlier messages.
+Calling `subscribe <topic>` again preserves an existing subscription's progress. Resuming after unsubscribing also uses the saved boundary without jumping to the latest message. There is no `--reset`. Use read-only `history` to look back at earlier messages.
 
 Resuming preserves the previous mute setting. An explicit `--muted` enables muting; `mute <topic> --off` disables it. Agents can send messages and read history without subscribing, and neither operation creates a subscription. `ack`, `mute`, and a Topic-specific `wait` require an active subscription to that Topic.
 
@@ -60,17 +54,19 @@ Pending messages are ordinary conversation messages from other participants afte
 | `last_acked_msg_id` | The current consumption boundary, or null when there is no boundary message. |
 | `first_pending_msg_id` | The first message awaiting acknowledgement, or null when none are pending. |
 | `last_msg_id` | The last message returned by this history call, or null when no messages are returned. |
+| `next_msg_id` | The first CLI-visible message immediately after this batch in the same query, or null when none follows. |
 | `remaining_count` | The number of CLI-visible messages after this history batch's last message that have not been returned, measured at query time; excludes the current batch. |
 
-`history` requires an explicit range. Range options are mutually exclusive. `--from` includes the specified message; `--after` excludes it. Both return at most 20 messages by default, adjustable with `--limit`. `--tail <n>` already specifies the count and does not take `--limit`.
+`history` can read conversation from before and after subscribing. It requires an explicit `--from` or `--tail`; the two are mutually exclusive. `--from <msg_id>` includes the specified message and subsequent conversation, returning at most 20 messages by default, adjustable with `--limit`. `--tail <n>` reads the latest n conversation messages; it already specifies the count and does not take `--limit`.
+
+For example, after an @ mention, use that message's `msg_id` with `--from` to read the mention and subsequent additions. If `wait` reports an earlier `first_pending_msg_id`, start there to include the context that still needs processing.
 
 ```text
 tbg --agent <name> history <topic> --from <msg_id> [--limit <n>]
-tbg --agent <name> history <topic> --after <msg_id> [--limit <n>]
 tbg --agent <name> history <topic> --tail <n>
 
 $ tbg --agent hopeful_morse history <topic>
-Error: specify --from, --after, or --tail.
+Error: specify --from or --tail.
 ```
 
 In this scenario, the Agent starts at the first pending message and reads the subsequent corrections before acting:
@@ -85,11 +81,13 @@ $ tbg --agent hopeful_morse history <topic> --from m42 --limit 2
 [m42] User: Please release the latest version
 [m43] User: Correction: do not release it yet
 last_msg_id: m43
+next_msg_id: m44
 remaining_count: 1
 
-$ tbg --agent hopeful_morse history <topic> --after m43
+$ tbg --agent hopeful_morse history <topic> --from m44
 [m44] User: Only run the tests and report the results
 last_msg_id: m44
+next_msg_id: null
 remaining_count: 0
 
 # The Agent follows the revised request, completes the tests, then replies and acknowledges.
@@ -100,18 +98,23 @@ $ tbg --agent hopeful_morse ack <topic> --through m44
 last_acked_msg_id: m44
 ```
 
-`history` always returns conversation messages in Topic order, including the Agent's own messages, without filtering by ack, @ mentions, or mute state. When `remaining_count` is greater than 0, the Agent continues with `--after <last_msg_id>` and reads the subsequent context before deciding how to respond. A value of 0 means that query reached the end; later arrivals appear in subsequent queries. Returning messages never acknowledges them.
+`history` always returns conversation messages in Topic order, including the Agent's own messages, without filtering by ack, @ mentions, or mute state. When `remaining_count` is greater than 0, `next_msg_id` identifies the next message not yet returned. The Agent continues with `--from <next_msg_id>`, advancing without repeating the boundary message even with `--limit 1`. It reads the subsequent context before deciding how to respond.
+
+`next_msg_id` and `remaining_count` describe the same query: a count of 0 means the next ID is null; a positive count means it is non-null. This is an ordinary `msg_id`, not a separate offset. Later arrivals appear in the next query or wait without changing the previous response. Reading never acknowledges messages automatically.
 
 ```text
 # Looking back does not require a subscription. Results remain in chronological order.
 $ tbg --agent hopeful_morse history <topic> --tail 20
-# Return at most the latest 20 messages, with remaining_count equal to 0.
+# Return at most the latest 20 messages, with next_msg_id null and remaining_count equal to 0.
 
-# When the conversation is empty, or --after identifies its last message:
+# For an empty conversation, --tail returns:
 messages: []
 last_msg_id: null
+next_msg_id: null
 remaining_count: 0
 ```
+
+When `--from` identifies the latest message, that message is still returned, with `next_msg_id` null and `remaining_count` equal to 0.
 
 Management commands, the Bot's management replies, and operation results are durably stored in the DB. They are excluded from Agent CLI `history`, pending messages, and `wait` triggers. For example:
 
@@ -258,7 +261,7 @@ Subscription and mute changes immediately affect a wait that is still running:
 CLI A: tbg --agent hopeful_morse wait
        Waits across all current subscriptions.
 
-CLI B: tbg --agent hopeful_morse subscribe <new-topic> --from end
+CLI B: tbg --agent hopeful_morse subscribe <new-topic>
        Adds new-topic to CLI A's waiting scope.
 CLI B: tbg --agent hopeful_morse mute <new-topic>
        Only pending messages explicitly @ mentioning this Agent can now wake it in that Topic.
@@ -276,10 +279,11 @@ Saved subscriptions, mute settings, and consumption boundaries survive CLI or ga
 
 | Scenario | Expected result |
 |---|---|
-| A first subscription has no starting point, or history has no range | Return an error listing the choices; leave subscriptions and progress unchanged. |
-| Mutually exclusive starting points or ranges are combined | Return an error instead of guessing precedence. |
+| History has no reading range | Return an error requiring `--from` or `--tail`; leave subscriptions and progress unchanged. |
+| History combines `--from` and `--tail` | Return an error instead of guessing precedence. |
+| Subscribe is given history range options | Return an error; subscriptions do not accept history ranges. |
 | `--limit` or `--tail` is not a positive integer, or `--timeout` is not a valid positive duration in seconds | Return an error; omit `--timeout` to wait indefinitely. |
-| A `msg_id` does not exist, belongs to another Topic, or is not CLI-visible | Reject it as a history starting point, subscription starting point, quote, or acknowledgement; leave progress unchanged. |
+| A `msg_id` does not exist, belongs to another Topic, or is not CLI-visible | Reject it as a history starting point, quote, or acknowledgement; leave progress unchanged. |
 | ack, mute, or a Topic-specific wait targets an unsubscribed Topic | Return an error requiring an explicit subscription first. |
 | Default wait is called with no subscriptions | Return an error asking the Agent to subscribe first. |
 | The Agent is interrupted after completing work but before ack | Messages remain pending and may be processed again after resumption; the Agent must account for repeating the work itself. |
