@@ -44,7 +44,7 @@ Use `unread` to continue processing and `history` to look back for context. Both
 | `unread` | The first CLI-visible conversation message after the current consumption boundary; the first message if the boundary is null. | Oldest to newest. |
 | `history` | The latest CLI-visible conversation message, with access to history from before subscribing. | Newest to oldest. |
 
-`--cursor <msg_id>` specifies the first message in this batch, inclusive. Pass the returned `next_msg_id` to the same command to continue paging without acknowledging first. An explicit cursor does not change the consumption boundary, and acknowledgements from other CLI invocations do not move its starting point. Omitting the cursor selects the default starting point again.
+`--cursor <msg_id>` specifies the first message in this batch, inclusive. Pass the returned `next_cursor` as `--cursor` to the same command to continue paging without acknowledging first. An explicit cursor does not change the consumption boundary, and acknowledgements from other CLI invocations do not move its starting point. Omitting the cursor selects the default starting point again.
 
 Pending messages are ordinary conversation from other participants after the consumption boundary. Unread and history return the continuous conversation within their reading range, including the Agent's own messages, without filtering by @ mentions or mute state. Own messages are not pending, so unread may return them even when there are no pending messages.
 
@@ -52,8 +52,7 @@ Pending messages are ordinary conversation from other participants after the con
 |---|---|
 | `last_acked_msg_id` | The current consumption boundary, or null when there is no boundary message. |
 | `first_pending_msg_id` | The first message awaiting acknowledgement, or null when none are pending. |
-| `last_msg_id` | The last message in output order: the newest in an unread batch, or the oldest in a history batch; null for an empty result. |
-| `next_msg_id` | The first CLI-visible message immediately beyond this batch in the command's reading direction, from the same query; null when no more messages remain. |
+| `next_cursor` | The starting point for the next call to the same command: an ordinary `msg_id` identifying the first CLI-visible message not yet returned in the reading direction; null when no more messages remain. |
 | `remaining_count` | The number of CLI-visible messages not yet returned in the reading direction, measured at query time: later messages for unread, earlier messages for history; excludes the current batch. |
 
 Agents should read the subsequent conversation before acting or replying so they do not miss corrections:
@@ -63,14 +62,12 @@ Agents should read the subsequent conversation before acting or replying so they
 $ tbg --agent hopeful_morse unread <topic> --limit 2
 [m42] User: Please release the latest version
 [m43] User: Correction: do not release it yet
-last_msg_id: m43
-next_msg_id: m44
+next_cursor: m44
 remaining_count: 1
 
 $ tbg --agent hopeful_morse unread <topic> --cursor m44
 [m44] User: Only run the tests and report the results
-last_msg_id: m44
-next_msg_id: null
+next_cursor: null
 remaining_count: 0
 
 # Follow the revised request, complete the tests, then reply and acknowledge.
@@ -87,25 +84,22 @@ Use history to read backward when earlier background is needed:
 $ tbg --agent hopeful_morse history <topic> --limit 2
 [m44] User: Only run the tests and report the results
 [m43] User: Correction: do not release it yet
-last_msg_id: m43
-next_msg_id: m42
+next_cursor: m42
 remaining_count: 2
 
 $ tbg --agent hopeful_morse history <topic> --cursor m42 --limit 2
 [m42] User: Please release the latest version
 [m41] User: Help me check the project
-last_msg_id: m41
-next_msg_id: null
+next_cursor: null
 remaining_count: 0
 ```
 
-`next_msg_id` and `remaining_count` describe the same query: a count of 0 means the next ID is null; otherwise it is non-null. Each call queries again, without a fixed snapshot across the traversal. New arrivals can be read through a later unread call or history without a cursor; continuing backward does not return newer arrivals.
+`next_cursor` and `remaining_count` describe the same query: a count of 0 means the cursor is null; otherwise it is non-null. Each call queries again, without a fixed snapshot across the traversal. New arrivals can be read through a later unread call or history without a cursor; continuing backward does not return newer arrivals.
 
 ```text
 # Without a cursor, unread with no conversation after the boundary, or history on an empty Topic, returns:
 messages: []
-last_msg_id: null
-next_msg_id: null
+next_cursor: null
 remaining_count: 0
 ```
 
@@ -134,7 +128,7 @@ Neither Reply nor @ creates a private message or an exclusive assignment; other 
 
 ## Acknowledging progress and continuing work
 
-`ack --through <msg_id>` cumulatively acknowledges through the specified message, inclusive. The Agent decides whether it has actually read and processed the pending messages up to that point. Only explicit ack advances the consumption boundary; reading, sending, quoting, muting, and wait never acknowledge on its behalf. A backward paging position in history does not represent consumption progress, and ack does not represent a Telegram client's read receipts.
+`ack --through <msg_id>` cumulatively acknowledges through the specified message, inclusive. The Agent decides whether it has actually read and processed the pending messages up to that point. Only explicit ack advances the consumption boundary; reading, sending, quoting, muting, and wait never acknowledge on its behalf. `next_cursor` does not represent processing progress, and ack does not represent a Telegram client's read receipts.
 
 ```text
 # Processed through m44; m45 is the Agent's own reply and m46 is a new User message.

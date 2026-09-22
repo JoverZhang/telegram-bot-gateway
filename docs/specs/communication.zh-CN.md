@@ -44,7 +44,7 @@ send 和 history 不要求订阅，也不会自动建立订阅。unread、ack、
 | `unread` | 当前消费边界之后的首条 CLI 可见对话消息；边界为 null 时从首条开始。 | 从旧到新。 |
 | `history` | 当前最新的 CLI 可见对话消息，可读到订阅前的历史。 | 从新到旧。 |
 
-`--cursor <msg_id>` 指定本批起点，包含该消息。将返回的 `next_msg_id` 传给同一命令即可继续分页，无需提前 ack。显式 cursor 不修改消费边界，也不因其他 CLI 的 ack 改变起点；省略 cursor 时重新使用默认起点。
+`--cursor <msg_id>` 指定本批起点，包含该消息。将返回的 `next_cursor` 作为 `--cursor` 传给同一命令即可继续分页，无需提前 ack。显式 cursor 不修改消费边界，也不因其他 CLI 的 ack 改变起点；省略 cursor 时重新使用默认起点。
 
 待确认消息是消费边界之后、由其他参与者发送的普通对话。unread 和 history 返回读取范围内的连续对话，包括自己的发言，不按 @ 或静音过滤。自己的消息不计入待确认消息，因此即使没有待确认消息，unread 也可能返回自己的发言。
 
@@ -52,8 +52,7 @@ send 和 history 不要求订阅，也不会自动建立订阅。unread、ack、
 |---|---|
 | `last_acked_msg_id` | 当前消费边界；尚无边界消息时为 null。 |
 | `first_pending_msg_id` | 首条待确认消息；没有待确认消息时为 null。 |
-| `last_msg_id` | 本批按输出顺序返回的末条消息；unread 中是本批最新一条，history 中是本批最早一条；空结果时为 null。 |
-| `next_msg_id` | 同次查询中，沿当前命令的读取方向，紧接本批的首条尚未返回的 CLI 可见消息 ID；没有更多消息时为 null。 |
+| `next_cursor` | 下一次调用同一命令的读取起点，值为普通 `msg_id`，指向沿当前读取方向紧接本批的首条尚未返回的 CLI 可见消息；没有更多消息时为 null。 |
 | `remaining_count` | 查询时，沿当前读取方向尚未返回的 CLI 可见消息数；unread 统计更晚的消息，history 统计更早的消息，均不含本批。 |
 
 Agent 应先读完后续对话再行动和回复，避免遗漏更正：
@@ -63,14 +62,12 @@ Agent 应先读完后续对话再行动和回复，避免遗漏更正：
 $ tbg --agent hopeful_morse unread <topic> --limit 2
 [m42] User: 请发布最新版本
 [m43] User: 更正，先不要发布
-last_msg_id: m43
-next_msg_id: m44
+next_cursor: m44
 remaining_count: 1
 
 $ tbg --agent hopeful_morse unread <topic> --cursor m44
 [m44] User: 只运行测试并报告结果
-last_msg_id: m44
-next_msg_id: null
+next_cursor: null
 remaining_count: 0
 
 # 按最新要求完成测试，再回复并确认。
@@ -87,25 +84,22 @@ last_acked_msg_id: m44
 $ tbg --agent hopeful_morse history <topic> --limit 2
 [m44] User: 只运行测试并报告结果
 [m43] User: 更正，先不要发布
-last_msg_id: m43
-next_msg_id: m42
+next_cursor: m42
 remaining_count: 2
 
 $ tbg --agent hopeful_morse history <topic> --cursor m42 --limit 2
 [m42] User: 请发布最新版本
 [m41] User: 帮我检查项目
-last_msg_id: m41
-next_msg_id: null
+next_cursor: null
 remaining_count: 0
 ```
 
-`next_msg_id` 与 `remaining_count` 反映同次查询：数量为 0 时下一条 ID 为 null，否则非空。每次调用重新查询，不固定整个分页过程的快照。新到的消息可通过后续 unread 或不带 cursor 的 history 读取；反向续读不会返回更晚到达的消息。
+`next_cursor` 与 `remaining_count` 反映同次查询：数量为 0 时 cursor 为 null，否则非空。每次调用重新查询，不固定整个分页过程的快照。新到的消息可通过后续 unread 或不带 cursor 的 history 读取；反向续读不会返回更晚到达的消息。
 
 ```text
 # 不带 cursor 时，unread 在消费边界之后找不到对话，或 history 面对空 Topic，返回：
 messages: []
-last_msg_id: null
-next_msg_id: null
+next_cursor: null
 remaining_count: 0
 ```
 
@@ -134,7 +128,7 @@ Reply 和 @ 都不建立私信或独占分配，其他 Agent 仍可读取同一�
 
 ## 确认进度与继续处理
 
-`ack --through <msg_id>` 累计确认到指定消息，包含该消息。Agent 负责判断此前待确认消息是否已实际读取并处理；只有显式 ack 推进消费边界，读取、发送、引用回复、静音和 wait 均不代为确认。history 的反向分页位置不代表消费进度，ack 也不代表 Telegram 客户端的已读回执。
+`ack --through <msg_id>` 累计确认到指定消息，包含该消息。Agent 负责判断此前待确认消息是否已实际读取并处理；只有显式 ack 推进消费边界，读取、发送、引用回复、静音和 wait 均不代为确认。`next_cursor` 不代表已处理进度，ack 也不代表 Telegram 客户端的已读回执。
 
 ```text
 # 已处理到 m44；m45 是自己的回复，m46 是 User 的新消息。
