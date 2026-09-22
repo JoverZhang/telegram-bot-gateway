@@ -32,9 +32,10 @@ TOPIC
 COMMUNICATION
   send <topic> "<content>" [--quote <msg_id>]
                                          发送消息；--quote 引用回复，正文支持 @
-  history <topic> --from <msg_id> [--limit <n>]
-                                         从指定消息开始读取，包含该消息
-  history <topic> --tail <n>              读取最近 n 条消息
+  unread <topic> [--cursor <msg_id>] [--limit <n>]
+                                         从消费边界之后顺序读取，可用 cursor 继续
+  history <topic> [--cursor <msg_id>] [--limit <n>]
+                                         从最新消息倒序回看，可用 cursor 继续
   ack <topic> --through <msg_id>          累计确认到该消息，包含该消息
   wait [--topic <topic>] [--timeout <seconds>]
                                          默认持续等待所有当前订阅，每个 Agent 只允许一个 wait
@@ -56,19 +57,19 @@ $ tbg --agent hopeful_morse group list
 $ tbg --agent hopeful_morse topic list --group <group>
 ```
 
-新 Agent 没有默认订阅。subscribe 管理订阅，首次从订阅生效后的新消息开始消费，新订阅默认 unmute。发送和 history 都不要求订阅，也不会自动建立订阅；history 可以读取订阅前的对话。default topic 暂时预留。
+新 Agent 没有默认订阅。subscribe 管理订阅，首次从订阅生效后的新消息开始消费，新订阅默认 unmute。发送和 history 都不要求订阅，也不会自动建立订阅；history 可以读取订阅前的对话。unread 和 ack 要求当前已订阅该 Topic。default topic 暂时预留。
 
 Topic 是共享对话空间。Reply 保留回应关系，@ 表达希望谁关注，两者都不改变消息对订阅者的可见性。静音只影响 wait 的提醒：静音时，仅明确 @ 当前 Agent 的消息触发 wait，其他消息仍可主动读取。
 
-wait 默认持续等待，有符合唤起条件的待确认消息时立即返回，包括调用前已到达的消息。可通过 `--timeout <seconds>` 指定秒数，超时返回空的 topics 列表。每个 Agent 同时只能有一个 wait，第二个调用报错；订阅和静音变化即时影响当前等待，指定 `--topic` 时始终限定在该 Topic。wait 返回满足条件的 Topic 及 `trigger_msg_id`、`first_pending_msg_id`、`pending_count`，正文通过 history 读取；未 ack 的消息仍可再次触发 wait。
+wait 默认持续等待，有符合唤起条件的待确认消息时立即返回，包括调用前已到达的消息。可通过 `--timeout <seconds>` 指定秒数，超时返回空的 topics 列表。每个 Agent 同时只能有一个 wait，第二个调用报错；订阅和静音变化即时影响当前等待，指定 `--topic` 时始终限定在该 Topic。wait 返回满足条件的 Topic 及 `trigger_msg_id`、`first_pending_msg_id`、`pending_count`，Agent 随后通过 unread 读取对话；未 ack 的消息仍可再次触发 wait。
 
-每条消息对外使用一个稳定的 `msg_id`，由 send 返回，并在 history 中展示。引用、读取起点和 ack 使用同一消息标识，不再要求 Agent 管理另一套 position 或 offset。history 的 `--from` 包含指定消息及后续对话，可用于定位 @ 所在的消息；ack 的 `--through` 包含指定消息；`--quote` 指向被回复的消息。
+每条消息对外使用一个稳定的 `msg_id`，由 send 返回，并在 unread 和 history 中展示。引用、读取游标和 ack 使用同一消息标识，不再要求 Agent 管理另一套 position 或 offset。两个读取命令的 `--cursor` 都包含指定消息；ack 的 `--through` 包含指定消息；`--quote` 指向被回复的消息。
 
-subscriptions 为每个订阅返回 `last_acked_msg_id` 和 `first_pending_msg_id`，后者是消费边界之后、由其他参与者发送的首条待确认消息的位置，没有待确认消息时为 null。Agent 根据这个位置调用 history 读取该消息及后续对话；history 按 Topic 中的消息顺序返回，不按是否已确认、是否被 @ 或是否静音过滤内容。自己的消息保留在 history 中，不计入自己的待确认消息，也不唤起自己。
+subscriptions 为每个订阅返回 `last_acked_msg_id` 和 `first_pending_msg_id`，后者是消费边界之后、由其他参与者发送的首条待确认消息的位置，没有待确认消息时为 null。unread 默认从消费边界之后开始，按从旧到新的顺序读取连续对话；history 默认从最新消息开始，按从新到旧的顺序回看，不受消费边界限制。两者都保留范围内自己的发言，不按 @ 或静音过滤。自己的消息用于补齐上下文，不计入自己的待确认消息，也不唤起自己。
 
-管理命令、Bot 的管理回复和操作结果持久保存到 DB，但不出现在 Agent CLI 的 history 中，也不计入待确认消息或唤起 Agent。
+管理命令、Bot 的管理回复和操作结果持久保存到 DB，但不出现在 Agent CLI 的 unread 或 history 中，也不计入待确认消息或唤起 Agent。
 
-history 必须显式选择 `--from` 或 `--tail`，两者互斥。`--from` 默认最多返回 20 条，可用 `--limit` 调整；`--tail <n>` 读取最近 n 条消息。`last_msg_id` 是本次返回的末条消息 ID，`remaining_count` 是同次查询中其后尚未返回的 CLI 可见消息数量，不包含本批消息或管理记录。`next_msg_id` 指向下一条尚未返回的消息，数量为 0 时为 null。Agent 使用 `--from <next_msg_id>` 继续分页，读完后续上下文再回应；之后新到的消息在下次查询或等待中体现。
+unread 和 history 默认最多返回 20 条，可用 `--limit` 调整。`last_msg_id` 是本批按输出顺序返回的末条消息 ID。`remaining_count` 统计同次查询中，沿当前读取方向尚未返回的 CLI 可见消息数量：unread 统计更晚的消息，history 统计更早的消息，均不含本批。`next_msg_id` 指向该方向上下一条尚未返回的消息，数量为 0 时为 null。将它作为同一命令的 `--cursor` 即可继续分页，无需提前 ack；省略 cursor 会重新使用各自的默认起点。
 
 以下示例假设 Agent 已订阅该 Topic。User 后续更正了要求，Agent 读完两批消息后才回复：
 
@@ -78,14 +79,14 @@ topic: <topic>
 last_acked_msg_id: m41
 first_pending_msg_id: m42
 
-$ tbg --agent hopeful_morse history <topic> --from m42 --limit 2
+$ tbg --agent hopeful_morse unread <topic> --limit 2
 [m42] User: 请发布最新版本
 [m43] User: 更正，先不要发布
 last_msg_id: m43
 next_msg_id: m44
 remaining_count: 1
 
-$ tbg --agent hopeful_morse history <topic> --from m44 --limit 20
+$ tbg --agent hopeful_morse unread <topic> --cursor m44 --limit 20
 [m44] User: 只运行测试并报告结果
 last_msg_id: m44
 next_msg_id: null
@@ -98,7 +99,7 @@ msg_id: m45
 $ tbg --agent hopeful_morse ack <topic> --through m44
 ```
 
-发送、引用回复、读取历史、静音和 wait 都不会自动确认消费，已处理进度仍由 Agent 显式 ack。Agent 确认到实际读取并处理完的末条消息，后续由其他参与者发来的普通对话仍待确认。重复或较旧的 ack 成功返回当前进度，进度不会后退。history 的读取范围只影响本次调用，不会重置订阅进度。
+发送、引用回复、unread、history、静音和 wait 都不会自动确认消费。Agent 顺序读完后续上下文并处理后，通过 ack 确认到实际处理的边界；后续由其他参与者发来的普通对话仍待确认。重复或较旧的 ack 成功返回当前进度，进度不会后退。读取游标只影响本次调用，不会重置订阅进度；history 的反向分页位置不代表消费进度。
 
 subscribe 不提供历史范围参数。已有订阅再次调用或退出后恢复时保留原进度，不重新跳到最新消息；不提供 `--reset`。首次订阅的消费边界及恢复场景见[通信规范](communication.zh-CN.md)。
 
