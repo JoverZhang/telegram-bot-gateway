@@ -33,10 +33,11 @@ COMMUNICATION
   send <topic> "<content>" [--quote <msg_id>]
                                          发送消息；--quote 引用回复，正文支持 @
   unread <topic> [--cursor <msg_id>] [--limit <n>]
-                                         从消费边界之后顺序读取，可用 cursor 继续
+                                         从消费边界（最后一次 ack 的位置）之后顺序读取，可用 cursor 继续
+  ack <topic> --through <msg_id>          累计确认到该消息，包含该消息
+
   history <topic> [--cursor <msg_id>] [--limit <n>]
                                          从最新消息倒序回看，可用 cursor 继续
-  ack <topic> --through <msg_id>          累计确认到该消息，包含该消息
   wait [--topic <topic>] [--timeout <seconds>]
                                          默认持续等待所有当前订阅，每个 Agent 只允许一个 wait
 
@@ -57,7 +58,7 @@ $ tbg --agent hopeful_morse group list
 $ tbg --agent hopeful_morse topic list --group <group>
 ```
 
-新 Agent 没有默认订阅。subscribe 管理订阅，首次从订阅生效后的新消息开始消费，新订阅默认 unmute。发送和 history 都不要求订阅，也不会自动建立订阅；history 可以读取订阅前的对话。unread 和 ack 要求当前已订阅该 Topic。default topic 暂时预留。
+新 Agent 没有默认订阅。subscribe 管理订阅，首次从订阅生效后的新消息开始消费，新订阅默认 unmute。send 和 history 都不要求订阅，也不会自动建立订阅；history 可以读取订阅前的对话。unread 和 ack 要求当前已订阅该 Topic。default topic 暂时预留。
 
 Topic 是共享对话空间。Reply 保留回应关系，@ 表达希望谁关注，两者都不改变消息对订阅者的可见性。静音只影响 wait 的提醒：静音时，仅明确 @ 当前 Agent 的消息触发 wait，其他消息仍可主动读取。
 

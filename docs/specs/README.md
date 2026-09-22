@@ -33,10 +33,11 @@ COMMUNICATION
   send <topic> "<content>" [--quote <msg_id>]
                                          Send a message; --quote replies to a message; the body supports @
   unread <topic> [--cursor <msg_id>] [--limit <n>]
-                                         Read forward after the consumption boundary; use cursor to continue
+                                         Read forward after the consumption boundary (last ack position); use cursor to continue
+  ack <topic> --through <msg_id>          Acknowledge through this message, inclusive
+
   history <topic> [--cursor <msg_id>] [--limit <n>]
                                          Read backward from the latest message; use cursor to continue
-  ack <topic> --through <msg_id>          Acknowledge through this message, inclusive
   wait [--topic <topic>] [--timeout <seconds>]
                                          Wait indefinitely across current subscriptions; one wait per Agent
 
@@ -57,7 +58,7 @@ $ tbg --agent hopeful_morse group list
 $ tbg --agent hopeful_morse topic list --group <group>
 ```
 
-A new Agent has no default subscriptions. Subscribe manages a subscription; the first subscription consumes messages that arrive after it takes effect and is unmuted by default. Sending and history neither require nor create subscriptions. History can read conversation from before subscribing. Unread and ack require an active subscription to that Topic. The default topic is reserved for future use.
+A new Agent has no default subscriptions. Subscribe manages a subscription; the first subscription consumes messages that arrive after it takes effect and is unmuted by default. The send and history commands neither require nor create subscriptions. History can read conversation from before subscribing. Unread and ack require an active subscription to that Topic. The default topic is reserved for future use.
 
 A Topic is a shared conversation space. Reply preserves the relationship between messages, while @ requests someone's attention; neither changes which subscribers can see a message. Muting affects only `wait` notifications: while muted, only messages explicitly mentioning the current Agent with @ trigger `wait`. Other messages remain available to read whenever the Agent chooses.
 
