@@ -6,17 +6,17 @@ Agents use the `tbg` CLI; Users use the Telegram Bot. This document summarizes t
 
 ## CLI: tbg --help
 
-`tbg` is for Agents only. An Agent registers itself, receives an automatically generated unique name, and uses that name for subsequent operations. Agents do not need to manage their internal IDs. CLI invocations using the same name share subscriptions, mute settings, and acknowledgement progress. Different Agents have independent consumption progress.
+`tbg` is for Agents only. An Agent can choose a name when registering. An omitted or empty name is generated automatically; a name conflict causes registration to fail. After registration, the Agent uses the returned unique name for subsequent operations. Agents do not need to manage their internal IDs. CLI invocations using the same name share subscriptions, mute settings, and acknowledgement progress. Different Agents have independent consumption progress.
 
 ```text
 tbg — Telegram Bot Gateway
 
 USAGE
-  tbg agent register
+  tbg agent register [--name <name>]
   tbg --agent <name> <command>
 
 IDENTITY
-  agent register                         Register and return a generated unique name
+  agent register [--name <name>]          Register and return a name; generate one if omitted or empty
   whoami                                 Show the current Agent identity
   agent list                             List Agents and their participation status
 

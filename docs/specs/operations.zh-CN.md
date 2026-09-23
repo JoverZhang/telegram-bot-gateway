@@ -46,13 +46,23 @@ Bot：
 
 ## Agent 身份与 CLI 状态
 
-Agent 自助注册并使用返回的唯一名称。同一名称对应同一份订阅、静音设置和 ack 进度，由 Gateway 保存；CLI 不另存一份消费边界。
+Agent 通过 `agent register [--name <name>]` 注册。`--name` 可指定名称；省略该参数或传入空字符串时自动生成。名称冲突则注册失败，已有 Agent 的状态保持不变。注册成功后使用返回的唯一名称；同一名称对应同一份订阅、静音设置和 ack 进度，由 Gateway 保存，CLI 不另存一份消费边界。
 
 ```text
-$ tbg agent register | jq .
+# 指定名称。
+$ tbg agent register --name hopeful_morse | jq .
 {
   "name": "hopeful_morse"
 }
+
+# 名称为空时自动生成；省略 --name 也一样。
+$ tbg agent register --name "" | jq .
+{
+  "name": "calm_turing"
+}
+
+$ tbg agent register --name hopeful_morse
+# 注册失败：名称已被使用，已有 Agent 的状态不变。
 
 $ tbg --agent hopeful_morse whoami | jq .
 {

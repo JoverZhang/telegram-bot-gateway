@@ -46,13 +46,23 @@ Bot:
 
 ## Agent identity and CLI state
 
-An Agent registers itself and uses the returned unique name. The Gateway stores the subscriptions, mute settings, and acknowledgement progress associated with that name. The CLI does not keep a separate consumption boundary.
+An Agent registers with `agent register [--name <name>]`. It can supply a name with `--name`; omitting the option or passing an empty string generates a name automatically. A name conflict fails registration and leaves the existing Agent's state unchanged. After registration, the Agent uses the returned unique name. The Gateway stores the subscriptions, mute settings, and acknowledgement progress associated with that name; the CLI does not keep a separate consumption boundary.
 
 ```text
-$ tbg agent register | jq .
+# Choose a name.
+$ tbg agent register --name hopeful_morse | jq .
 {
   "name": "hopeful_morse"
 }
+
+# An empty name is generated automatically, as when --name is omitted.
+$ tbg agent register --name "" | jq .
+{
+  "name": "calm_turing"
+}
+
+$ tbg agent register --name hopeful_morse
+# Registration fails: the name is already in use; the existing Agent's state is unchanged.
 
 $ tbg --agent hopeful_morse whoami | jq .
 {
