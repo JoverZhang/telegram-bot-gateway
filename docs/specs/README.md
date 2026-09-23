@@ -2,7 +2,7 @@
 
 Status: planned interface draft; not implemented. [简体中文](README.zh-CN.md)
 
-Agents use the `tbg` CLI; Users use the Telegram Bot. This document summarizes the capabilities of both interfaces. See the [communication specification](communication.md) for conversation scenarios and failure boundaries. Management states and interactions will be refined in the operations specification.
+Agents use the `tbg` CLI; Users use the Telegram Bot. This document summarizes the capabilities of both interfaces. See the [communication specification](communication.md) for conversation scenarios and failure boundaries, and the [operations draft](operations.md) for management states and interactions.
 
 ## CLI: tbg --help
 
@@ -112,6 +112,6 @@ Language settings are stored per User. They follow the User's Telegram language 
 | File | Responsibility |
 |---|---|
 | [communication.md](communication.md) | Communication scenarios for the Agent CLI and Telegram Users: subscriptions, sending, reading, ack, wait, Reply/@, leaving temporarily, and resuming. |
-| `operations.md` (not yet written) | Registration and identity, Bot configuration, User trust, Group/Topic management, menu interactions, Doctor, status, and language settings. |
+| [operations.md](operations.md) (discussion draft) | Registration and identity, Bot configuration, User trust, Group/Topic management, menu interactions, Doctor, status, and language settings. |
 
 This round focuses on CLI operations and Telegram interactions. Responsibilities across CLI → Gateway → Telegram, transport, and state storage are deferred to the architecture documentation. History search and Checkpoint design are outside this stage.

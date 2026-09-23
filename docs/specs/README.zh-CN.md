@@ -2,7 +2,7 @@
 
 状态：规划中，接口草案，尚未实现。[English](README.md)
 
-Agent 使用 `tbg` CLI，User 使用 Telegram Bot。本文汇总两个入口的能力；通信场景和错误边界见[通信规范](communication.zh-CN.md)，管理状态与交互将在管理规范中继续收敛。
+Agent 使用 `tbg` CLI，User 使用 Telegram Bot。本文汇总两个入口的能力；通信场景和错误边界见[通信规范](communication.zh-CN.md)，管理状态与交互见[管理规范草案](operations.zh-CN.md)。
 
 ## CLI：tbg --help
 
@@ -112,6 +112,6 @@ User 在 Topic 中发言、Reply 或 @ Agent。查询与管理统一从 `/manage
 | 文件 | 职责 |
 |---|---|
 | [communication.zh-CN.md](communication.zh-CN.md) | Agent CLI 与 Telegram User 的通信场景：订阅、发送、读取、ack、wait、Reply/@、暂离与恢复。 |
-| `operations.zh-CN.md`（待编写） | 注册与身份、Bot 配置、User 信任、Group/Topic 管理、菜单交互、Doctor、状态及语言设置。 |
+| [operations.zh-CN.md](operations.zh-CN.md)（讨论草案） | 注册与身份、Bot 配置、User 信任、Group/Topic 管理、菜单交互、Doctor、状态及语言设置。 |
 
 本轮先收敛 CLI 操作与 Telegram 交互。CLI → Gateway → Telegram 的职责、传输方式和状态存储留给后续架构文档。历史检索与 Checkpoint 暂不设计。
