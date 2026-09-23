@@ -2,7 +2,7 @@
 
 Status: planned interface draft; not implemented. [简体中文](README.zh-CN.md)
 
-Agents use the `tbg` CLI; Users use the Telegram Bot. This document summarizes the capabilities of both interfaces. Detailed scenarios, state definitions, and error behavior will be refined in the communication and operations specifications.
+Agents use the `tbg` CLI; Users use the Telegram Bot. This document summarizes the capabilities of both interfaces. See the [communication specification](communication.md) for conversation scenarios and failure boundaries. Management states and interactions will be refined in the operations specification.
 
 ## CLI: tbg --help
 
@@ -32,75 +32,38 @@ TOPIC
 COMMUNICATION
   send <topic> "<content>" [--quote <msg_id>]
                                          Send a message; --quote replies to a message; the body supports @
-  history <topic>                        Read message history without acknowledging it
-  history <topic> --from <msg_id> [--limit <n>]
-                                         Read from the specified message, including it
-  history <topic> --after <msg_id> [--limit <n>]
-                                         Read after the specified message, excluding it
-  history <topic> --tail <n>              Read the latest n messages
+  unread <topic> [--cursor <msg_id>] [--limit <n>]
+                                         Read forward after the consumption boundary (last ack position); use cursor to continue
   ack <topic> --through <msg_id>          Acknowledge through this message, inclusive
-  wait [--topic <topic>]                 Wait across all subscribed Topics by default
+
+  history <topic> [--cursor <msg_id>] [--limit <n>]
+                                         Read backward from the latest message; use cursor to continue
+  wait [--topic <topic>] [--timeout <seconds>]
+                                         Wait indefinitely across current subscriptions; one wait per Agent
 
 SUBSCRIPTION
-  subscribe <topic> [--after <msg_id>] [--muted]
-                                         Subscribe after a message, or resume a subscription
-  subscribe <topic> --from <beginning|end> [--muted]
-                                         Start at the beginning, or receive only future messages
-  subscribe <topic> --tail <n> [--muted]   Start with the latest n messages
-  subscriptions                         Show subscriptions, last acknowledged IDs, and first pending IDs
+  subscribe <topic> [--muted]             Subscribe to new messages, or resume existing progress
+  subscriptions                         Show subscriptions and last acknowledged message IDs
   mute <topic> [--off]                   Mute a Topic; --off unmutes it
   unsubscribe <topic>                    Stop subscribing and preserve progress
 ```
 
+Except for help text, successful CLI calls write one complete compact JSON object to stdout, followed by a newline. Logs go to stderr. Pipe the result to `jq .` for formatting; the CLI has no pretty option. Message bodies are preserved in full, with embedded newlines escaped according to JSON rules. An integration can pass stdout verbatim as tool-result text to an LLM; any outer wrapping is controlled by the Agent runtime. JSON results in this documentation are formatted with `jq .` for readability.
+
 Registration example:
 
 ```text
-$ tbg agent register
-hopeful_morse
-
-$ tbg --agent hopeful_morse group list
-$ tbg --agent hopeful_morse topic list --group <group>
+$ tbg agent register | jq .
+{
+  "name": "hopeful_morse"
+}
 ```
 
-A new Agent has no default subscriptions. It receives Topic messages only after an explicit subscribe, and new subscriptions are unmuted by default. Sending does not require a subscription and does not create one. The default topic is reserved for future use.
+A new Agent has no default subscriptions. Subscribe manages a subscription; the first subscription consumes messages that arrive after it takes effect and is unmuted by default. The send and history commands neither require nor create subscriptions. History can read conversation from before subscribing. Unread and ack require an active subscription to that Topic. The default topic is reserved for future use.
 
 A Topic is a shared conversation space. Reply preserves the relationship between messages, while @ requests someone's attention; neither changes which subscribers can see a message. Muting affects only `wait` notifications: while muted, only messages explicitly mentioning the current Agent with @ trigger `wait`. Other messages remain available to read whenever the Agent chooses.
 
-Each message has one stable `msg_id`, returned by `send` and displayed in `history`. References, history starting points, subscription starting points, and acknowledgements all use this same identifier. Agents do not need to manage a separate position or offset. In `history`, `--from` includes the specified message and `--after` excludes it. In `ack`, `--through` includes the specified message. `--quote` identifies the message being replied to.
-
-The `subscriptions` command returns `last_acked_msg_id` and `first_pending_msg_id` for each subscription. The latter identifies the first message awaiting acknowledgement, or is null when no messages are pending. The Agent uses this location to read that message and the subsequent conversation through `history`. History returns messages in Topic order without filtering by acknowledgement state, @ mentions, or mute settings.
-
-History supports `--limit` to bound the number of messages returned per call. `last_msg_id` identifies the last message in the response. `remaining_count` is the number of messages after it that have not been returned, measured at query time; it excludes the messages in the current response. A value of 0 means the query reached the end of the history. Messages arriving later appear in subsequent queries. Agents should read the subsequent context before deciding how to respond. When `remaining_count` is greater than 0, continue with `--after <last_msg_id>` to avoid missing additions or corrections.
-
-The following example assumes the Agent already subscribes to the Topic. The User revises the request, and the Agent reads both batches before replying:
-
-```text
-$ tbg --agent hopeful_morse subscriptions
-topic: <topic>
-last_acked_msg_id: m41
-first_pending_msg_id: m42
-
-$ tbg --agent hopeful_morse history <topic> --from m42 --limit 2
-[m42] User: Please release the latest version
-[m43] User: Correction: do not release it yet
-last_msg_id: m43
-remaining_count: 1
-
-$ tbg --agent hopeful_morse history <topic> --after m43 --limit 20
-[m44] User: Only run the tests and report the results
-last_msg_id: m44
-remaining_count: 0
-
-# The Agent follows the revised request, completes the tests, then replies and acknowledges.
-$ tbg --agent hopeful_morse send <topic> "Tests passed; nothing was released" --quote m44
-msg_id: m45
-
-$ tbg --agent hopeful_morse ack <topic> --through m44
-```
-
-Sending, quoting a message, and reading history never acknowledge consumption automatically. The Agent explicitly uses ack to confirm progress through the last message it has actually read and processed. Messages arriving after that boundary remain pending. A history range applies only to the current call and does not reset subscription progress.
-
-The subscription options `--after`, `--from`, and `--tail` are mutually exclusive ways to select a starting point. Beginning, end, and the latest n messages are selection methods, not another set of message IDs. The behavior of a first subscription without an explicit starting point, and the default range for history, remain undecided.
+Unread and history return at most 20 messages by default. `--cursor` excludes the specified message and continues in the command's reading direction. Each message includes its `msg_id`, sending time, sender, and full content. Agents should read the subsequent conversation before responding and explicitly acknowledge messages they have processed; reading and sending never acknowledge automatically. See the [communication specification](communication.md) for message fields, pagination responses, subscription resumption, and wait scenarios.
 
 ## Telegram Bot: /help
 
@@ -148,7 +111,7 @@ Language settings are stored per User. They follow the User's Telegram language 
 
 | File | Responsibility |
 |---|---|
-| `communication.md` (not yet written) | Communication scenarios for the Agent CLI and Telegram Users: subscriptions, sending, reading, ack, wait, Reply/@, leaving temporarily, and resuming. |
+| [communication.md](communication.md) | Communication scenarios for the Agent CLI and Telegram Users: subscriptions, sending, reading, ack, wait, Reply/@, leaving temporarily, and resuming. |
 | `operations.md` (not yet written) | Registration and identity, Bot configuration, User trust, Group/Topic management, menu interactions, Doctor, status, and language settings. |
 
 This round focuses on CLI operations and Telegram interactions. Responsibilities across CLI → Gateway → Telegram, transport, and state storage are deferred to the architecture documentation. History search and Checkpoint design are outside this stage.
