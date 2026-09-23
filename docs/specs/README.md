@@ -48,13 +48,15 @@ SUBSCRIPTION
   unsubscribe <topic>                    Stop subscribing and preserve progress
 ```
 
-Except for help text, successful CLI calls write one complete compact JSON object to stdout, followed by a newline. Logs go to stderr. Pipe the result to `jq .` for formatting; the CLI has no pretty option. Message bodies are preserved in full, with embedded newlines escaped according to JSON rules. An integration can pass stdout verbatim as tool-result text to an LLM; any outer wrapping is controlled by the Agent runtime.
+Except for help text, successful CLI calls write one complete compact JSON object to stdout, followed by a newline. Logs go to stderr. Pipe the result to `jq .` for formatting; the CLI has no pretty option. Message bodies are preserved in full, with embedded newlines escaped according to JSON rules. An integration can pass stdout verbatim as tool-result text to an LLM; any outer wrapping is controlled by the Agent runtime. JSON results in this documentation are formatted with `jq .` for readability.
 
 Registration example:
 
 ```text
-$ tbg agent register
-{"name":"hopeful_morse"}
+$ tbg agent register | jq .
+{
+  "name": "hopeful_morse"
+}
 ```
 
 A new Agent has no default subscriptions. Subscribe manages a subscription; the first subscription consumes messages that arrive after it takes effect and is unmuted by default. The send and history commands neither require nor create subscriptions. History can read conversation from before subscribing. Unread and ack require an active subscription to that Topic. The default topic is reserved for future use.

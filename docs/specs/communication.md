@@ -20,8 +20,22 @@ $ tbg --agent hopeful_morse subscribe <topic>
 $ tbg --agent hopeful_morse unsubscribe <topic>
 # The User sends m42 while the Agent is unsubscribed.
 $ tbg --agent hopeful_morse subscribe <topic>
-$ tbg --agent hopeful_morse unread <topic>
-{"messages":[{"msg_id":"m42","sent_at":"2026-09-22T09:10:00Z","sender":{"type":"user","user_id":12345678},"content":"Please check the test results"}],"next_cursor":"m42","remaining_count":0}
+$ tbg --agent hopeful_morse unread <topic> | jq .
+{
+  "messages": [
+    {
+      "msg_id": "m42",
+      "sent_at": "2026-09-22T09:10:00Z",
+      "sender": {
+        "type": "user",
+        "user_id": 12345678
+      },
+      "content": "Please check the test results"
+    }
+  ],
+  "next_cursor": "m42",
+  "remaining_count": 0
+}
 ```
 
 Repeating a subscription or resuming after unsubscribing preserves the consumption boundary and mute setting. An explicit `--muted` enables muting; `mute <topic> --off` disables it.
@@ -63,43 +77,156 @@ Agents should read the subsequent conversation before acting or replying so they
 
 ```text
 # Subscribed, with a consumption boundary of m41; the User then sends m42, m43, and m44.
-$ tbg --agent hopeful_morse unread <topic> --limit 2
-{"messages":[{"msg_id":"m42","sent_at":"2026-09-22T09:10:00Z","sender":{"type":"user","user_id":12345678},"content":"Please release the latest version"},{"msg_id":"m43","sent_at":"2026-09-22T09:11:00Z","sender":{"type":"user","user_id":12345678},"content":"Correction: do not release it yet"}],"next_cursor":"m43","remaining_count":1}
+$ tbg --agent hopeful_morse unread <topic> --limit 2 | jq .
+{
+  "messages": [
+    {
+      "msg_id": "m42",
+      "sent_at": "2026-09-22T09:10:00Z",
+      "sender": {
+        "type": "user",
+        "user_id": 12345678
+      },
+      "content": "Please release the latest version"
+    },
+    {
+      "msg_id": "m43",
+      "sent_at": "2026-09-22T09:11:00Z",
+      "sender": {
+        "type": "user",
+        "user_id": 12345678
+      },
+      "content": "Correction: do not release it yet"
+    }
+  ],
+  "next_cursor": "m43",
+  "remaining_count": 1
+}
 
-$ tbg --agent hopeful_morse unread <topic> --cursor m43
-{"messages":[{"msg_id":"m44","sent_at":"2026-09-22T09:12:00Z","sender":{"type":"user","user_id":12345678},"content":"Only run the tests and report the results"}],"next_cursor":"m44","remaining_count":0}
+$ tbg --agent hopeful_morse unread <topic> --cursor m43 | jq .
+{
+  "messages": [
+    {
+      "msg_id": "m44",
+      "sent_at": "2026-09-22T09:12:00Z",
+      "sender": {
+        "type": "user",
+        "user_id": 12345678
+      },
+      "content": "Only run the tests and report the results"
+    }
+  ],
+  "next_cursor": "m44",
+  "remaining_count": 0
+}
 
 # Follow the revised request, complete the tests, then reply and acknowledge.
-$ tbg --agent hopeful_morse send <topic> "Tests passed; nothing was released" --quote m44
-{"msg_id":"m45"}
-$ tbg --agent hopeful_morse ack <topic> --through m44
-{"last_acked_msg_id":"m44"}
+$ tbg --agent hopeful_morse send <topic> "Tests passed; nothing was released" --quote m44 | jq .
+{
+  "msg_id": "m45"
+}
+$ tbg --agent hopeful_morse ack <topic> --through m44 | jq .
+{
+  "last_acked_msg_id": "m44"
+}
 ```
 
 Use history to read backward when earlier background is needed:
 
 ```text
 # Independent scenario: the Topic contains only four conversation messages: m41, m42, m43, and m44.
-$ tbg --agent hopeful_morse history <topic> --limit 2
-{"messages":[{"msg_id":"m44","sent_at":"2026-09-22T09:12:00Z","sender":{"type":"user","user_id":12345678},"content":"Only run the tests and report the results"},{"msg_id":"m43","sent_at":"2026-09-22T09:11:00Z","sender":{"type":"user","user_id":12345678},"content":"Correction: do not release it yet"}],"next_cursor":"m43","remaining_count":2}
+$ tbg --agent hopeful_morse history <topic> --limit 2 | jq .
+{
+  "messages": [
+    {
+      "msg_id": "m44",
+      "sent_at": "2026-09-22T09:12:00Z",
+      "sender": {
+        "type": "user",
+        "user_id": 12345678
+      },
+      "content": "Only run the tests and report the results"
+    },
+    {
+      "msg_id": "m43",
+      "sent_at": "2026-09-22T09:11:00Z",
+      "sender": {
+        "type": "user",
+        "user_id": 12345678
+      },
+      "content": "Correction: do not release it yet"
+    }
+  ],
+  "next_cursor": "m43",
+  "remaining_count": 2
+}
 
-$ tbg --agent hopeful_morse history <topic> --cursor m43 --limit 2
-{"messages":[{"msg_id":"m42","sent_at":"2026-09-22T09:10:00Z","sender":{"type":"user","user_id":12345678},"content":"Please release the latest version"},{"msg_id":"m41","sent_at":"2026-09-22T09:09:00Z","sender":{"type":"user","user_id":12345678},"content":"Help me check the project"}],"next_cursor":"m41","remaining_count":0}
+$ tbg --agent hopeful_morse history <topic> --cursor m43 --limit 2 | jq .
+{
+  "messages": [
+    {
+      "msg_id": "m42",
+      "sent_at": "2026-09-22T09:10:00Z",
+      "sender": {
+        "type": "user",
+        "user_id": 12345678
+      },
+      "content": "Please release the latest version"
+    },
+    {
+      "msg_id": "m41",
+      "sent_at": "2026-09-22T09:09:00Z",
+      "sender": {
+        "type": "user",
+        "user_id": 12345678
+      },
+      "content": "Help me check the project"
+    }
+  ],
+  "next_cursor": "m41",
+  "remaining_count": 0
+}
 ```
 
 `remaining_count: 0` means only that no more messages remain in that direction at query time; it does not clear the cursor. Each call queries again, without a fixed snapshot across the traversal. Keeping the unread cursor allows reading messages that arrive later. Continuing backward with history does not return newer arrivals; omit the cursor to read the latest conversation again.
 
 ```text
 # Read through m44 without acknowledging; no new messages have arrived.
-$ tbg --agent hopeful_morse unread <topic> --cursor m44
-{"messages":[],"next_cursor":"m44","remaining_count":0}
+$ tbg --agent hopeful_morse unread <topic> --cursor m44 | jq .
+{
+  "messages": [],
+  "next_cursor": "m44",
+  "remaining_count": 0
+}
 
 # The User then sends m45; the saved cursor continues without rereading m44.
-$ tbg --agent hopeful_morse unread <topic> --cursor m44
-{"messages":[{"msg_id":"m45","sent_at":"2026-09-22T09:13:00Z","sender":{"type":"user","user_id":12345678},"content":"Please attach the test report"}],"next_cursor":"m45","remaining_count":0}
+$ tbg --agent hopeful_morse unread <topic> --cursor m44 | jq .
+{
+  "messages": [
+    {
+      "msg_id": "m45",
+      "sent_at": "2026-09-22T09:13:00Z",
+      "sender": {
+        "type": "user",
+        "user_id": 12345678
+      },
+      "content": "Please attach the test report"
+    }
+  ],
+  "next_cursor": "m45",
+  "remaining_count": 0
+}
 ```
 
-An empty Topic with no known reading position returns `{"messages":[],"next_cursor":null,"remaining_count":0}`.
+An empty Topic with no known reading position returns:
+
+```json
+{
+  "messages": [],
+  "next_cursor": null,
+  "remaining_count": 0
+}
+```
 
 Management interactions (commands, menu selections, the Bot's management replies, and operation results) are durably stored in the DB. They are excluded from unread, history, pending messages, and remaining_count, and do not trigger wait.
 
@@ -109,13 +236,17 @@ In send, `--quote` identifies the message being replied to, while `@<name>` in t
 
 ```text
 # calm_turing is subscribed, and the messages below follow its consumption boundary.
-$ tbg --agent hopeful_morse send <topic> "@calm_turing Please review the test results"
-{"msg_id":"m51"}
+$ tbg --agent hopeful_morse send <topic> "@calm_turing Please review the test results" | jq .
+{
+  "msg_id": "m51"
+}
 
 $ tbg --agent calm_turing unread <topic>
 # Read the subsequent conversation before replying.
-$ tbg --agent calm_turing send <topic> "Review passed" --quote m51
-{"msg_id":"m52"}
+$ tbg --agent calm_turing send <topic> "Review passed" --quote m51 | jq .
+{
+  "msg_id": "m52"
+}
 
 Telegram Topic:
   hopeful_morse: @calm_turing Please review the test results
@@ -130,24 +261,37 @@ Neither Reply nor @ creates a private message or an exclusive assignment; other 
 
 ```text
 # Processed through m44; m45 is the Agent's own reply and m46 is a new User message.
-$ tbg --agent hopeful_morse ack <topic> --through m44
-{"last_acked_msg_id":"m44"}
+$ tbg --agent hopeful_morse ack <topic> --through m44 | jq .
+{
+  "last_acked_msg_id": "m44"
+}
 
 $ tbg --agent hopeful_morse unread <topic>
 # Start at m45, including the Agent's own reply and the User's m46.
 # Interrupted after reading but before ack: the consumption boundary stays unchanged.
-$ tbg --agent hopeful_morse subscriptions
-{"subscriptions":[{"topic":"<topic>","last_acked_msg_id":"m44"}]}
+$ tbg --agent hopeful_morse subscriptions | jq .
+{
+  "subscriptions": [
+    {
+      "topic": "<topic>",
+      "last_acked_msg_id": "m44"
+    }
+  ]
+}
 ```
 
 A repeated or older ack succeeds and returns the current boundary without moving it backward. Multiple CLI invocations using the same identity may send acknowledgements:
 
 ```text
 # In this Topic, m50 comes after m45.
-CLI A: tbg --agent hopeful_morse ack <topic> --through m50
-       {"last_acked_msg_id":"m50"}
-CLI B: tbg --agent hopeful_morse ack <topic> --through m45
-       {"last_acked_msg_id":"m50"}
+CLI A: tbg --agent hopeful_morse ack <topic> --through m50 | jq .
+       {
+         "last_acked_msg_id": "m50"
+       }
+CLI B: tbg --agent hopeful_morse ack <topic> --through m45 | jq .
+       {
+         "last_acked_msg_id": "m50"
+       }
 ```
 
 If work completes but the Agent is interrupted before ack, messages remain pending and may be processed again after resumption. The Agent must account for repeating the work itself.
@@ -161,7 +305,15 @@ When unmuted, any pending message can cause a wakeup. While muted, only an expli
 A wakeup collects the Topics in the waiting scope that currently meet the condition. It returns locations only, without message bodies:
 
 ```json
-{"topics":[{"topic":"<topic>","trigger_msg_id":"m44","pending_count":3}]}
+{
+  "topics": [
+    {
+      "topic": "<topic>",
+      "trigger_msg_id": "m44",
+      "pending_count": 3
+    }
+  ]
+}
 ```
 
 `trigger_msg_id` is the first pending message in that Topic that meets the wakeup condition. It explains the wakeup; unread still reads the complete conversation after the consumption boundary. `pending_count` counts all pending messages in the Topic, including conversation that did not trigger the wakeup. It excludes the Agent's own messages and management records.
@@ -173,14 +325,20 @@ Telegram Topic:
   [m43] User: Correction: do not release it yet
   [m44] User: @hopeful_morse Please only run the tests
 
-$ tbg --agent hopeful_morse wait --topic <topic>
+$ tbg --agent hopeful_morse wait --topic <topic> | jq .
 # Returns the structure above: m44 triggers the wakeup, but reading starts at m42.
 $ tbg --agent hopeful_morse unread <topic>
 # Read the subsequent conversation, then follow the latest request and explicitly ack.
 # Without an ack, the next wait immediately returns eligible pending messages again.
 ```
 
-Wait does not reserve messages. Its response reflects the state at that time; later acknowledgements or setting changes from other CLI invocations do not rewrite it. A timeout with no eligible messages returns `{"topics":[]}`; explicit cancellation ends the wait.
+Wait does not reserve messages. Its response reflects the state at that time; later acknowledgements or setting changes from other CLI invocations do not rewrite it. Explicit cancellation ends the wait. A timeout with no eligible messages returns:
+
+```json
+{
+  "topics": []
+}
+```
 
 **Only one wait may run per Agent at a time**, across CLI invocations and Topics. A second call fails while the original continues. Once it returns, times out, is cancelled, or ends with an error, another wait can begin. Other commands remain available during a wait.
 

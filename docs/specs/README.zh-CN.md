@@ -48,13 +48,15 @@ SUBSCRIPTION
   unsubscribe <topic>                    停止订阅，保留进度
 ```
 
-除帮助文本外，CLI 成功时向 stdout 输出一个完整的紧凑 JSON 对象，末尾追加换行。日志写入 stderr；需要格式化时通过管道交给 `jq .`，CLI 不提供 pretty 选项。消息正文完整保留，正文中的换行按 JSON 规则转义。接入层可将 stdout 原文作为 LLM 的工具结果文本，外层包装由 Agent runtime 决定。
+除帮助文本外，CLI 成功时向 stdout 输出一个完整的紧凑 JSON 对象，末尾追加换行。日志写入 stderr；需要格式化时通过管道交给 `jq .`，CLI 不提供 pretty 选项。消息正文完整保留，正文中的换行按 JSON 规则转义。接入层可将 stdout 原文作为 LLM 的工具结果文本，外层包装由 Agent runtime 决定。文档中的 JSON 结果按 `jq .` 格式化展示。
 
 注册示例：
 
 ```text
-$ tbg agent register
-{"name":"hopeful_morse"}
+$ tbg agent register | jq .
+{
+  "name": "hopeful_morse"
+}
 ```
 
 新 Agent 没有默认订阅。subscribe 管理订阅，首次从订阅生效后的新消息开始消费，新订阅默认 unmute。send 和 history 都不要求订阅，也不会自动建立订阅；history 可以读取订阅前的对话。unread 和 ack 要求当前已订阅该 Topic。default topic 暂时预留。

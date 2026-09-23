@@ -20,8 +20,22 @@ $ tbg --agent hopeful_morse subscribe <topic>
 $ tbg --agent hopeful_morse unsubscribe <topic>
 # 退出期间 User 发来 m42。
 $ tbg --agent hopeful_morse subscribe <topic>
-$ tbg --agent hopeful_morse unread <topic>
-{"messages":[{"msg_id":"m42","sent_at":"2026-09-22T09:10:00Z","sender":{"type":"user","user_id":12345678},"content":"请检查测试结果"}],"next_cursor":"m42","remaining_count":0}
+$ tbg --agent hopeful_morse unread <topic> | jq .
+{
+  "messages": [
+    {
+      "msg_id": "m42",
+      "sent_at": "2026-09-22T09:10:00Z",
+      "sender": {
+        "type": "user",
+        "user_id": 12345678
+      },
+      "content": "请检查测试结果"
+    }
+  ],
+  "next_cursor": "m42",
+  "remaining_count": 0
+}
 ```
 
 重复订阅或退出后恢复均保留消费边界和静音设置。显式 `--muted` 开启静音，`mute <topic> --off` 取消静音。
@@ -63,43 +77,156 @@ Agent 应先读完后续对话再行动和回复，避免遗漏更正：
 
 ```text
 # 已订阅，消费边界为 m41；User 随后发来 m42、m43、m44。
-$ tbg --agent hopeful_morse unread <topic> --limit 2
-{"messages":[{"msg_id":"m42","sent_at":"2026-09-22T09:10:00Z","sender":{"type":"user","user_id":12345678},"content":"请发布最新版本"},{"msg_id":"m43","sent_at":"2026-09-22T09:11:00Z","sender":{"type":"user","user_id":12345678},"content":"更正，先不要发布"}],"next_cursor":"m43","remaining_count":1}
+$ tbg --agent hopeful_morse unread <topic> --limit 2 | jq .
+{
+  "messages": [
+    {
+      "msg_id": "m42",
+      "sent_at": "2026-09-22T09:10:00Z",
+      "sender": {
+        "type": "user",
+        "user_id": 12345678
+      },
+      "content": "请发布最新版本"
+    },
+    {
+      "msg_id": "m43",
+      "sent_at": "2026-09-22T09:11:00Z",
+      "sender": {
+        "type": "user",
+        "user_id": 12345678
+      },
+      "content": "更正，先不要发布"
+    }
+  ],
+  "next_cursor": "m43",
+  "remaining_count": 1
+}
 
-$ tbg --agent hopeful_morse unread <topic> --cursor m43
-{"messages":[{"msg_id":"m44","sent_at":"2026-09-22T09:12:00Z","sender":{"type":"user","user_id":12345678},"content":"只运行测试并报告结果"}],"next_cursor":"m44","remaining_count":0}
+$ tbg --agent hopeful_morse unread <topic> --cursor m43 | jq .
+{
+  "messages": [
+    {
+      "msg_id": "m44",
+      "sent_at": "2026-09-22T09:12:00Z",
+      "sender": {
+        "type": "user",
+        "user_id": 12345678
+      },
+      "content": "只运行测试并报告结果"
+    }
+  ],
+  "next_cursor": "m44",
+  "remaining_count": 0
+}
 
 # 按最新要求完成测试，再回复并确认。
-$ tbg --agent hopeful_morse send <topic> "测试已通过，未发布" --quote m44
-{"msg_id":"m45"}
-$ tbg --agent hopeful_morse ack <topic> --through m44
-{"last_acked_msg_id":"m44"}
+$ tbg --agent hopeful_morse send <topic> "测试已通过，未发布" --quote m44 | jq .
+{
+  "msg_id": "m45"
+}
+$ tbg --agent hopeful_morse ack <topic> --through m44 | jq .
+{
+  "last_acked_msg_id": "m44"
+}
 ```
 
 需要更早的背景时，通过 history 向旧消息回看：
 
 ```text
 # 独立场景：Topic 仅有 m41、m42、m43、m44 四条对话消息。
-$ tbg --agent hopeful_morse history <topic> --limit 2
-{"messages":[{"msg_id":"m44","sent_at":"2026-09-22T09:12:00Z","sender":{"type":"user","user_id":12345678},"content":"只运行测试并报告结果"},{"msg_id":"m43","sent_at":"2026-09-22T09:11:00Z","sender":{"type":"user","user_id":12345678},"content":"更正，先不要发布"}],"next_cursor":"m43","remaining_count":2}
+$ tbg --agent hopeful_morse history <topic> --limit 2 | jq .
+{
+  "messages": [
+    {
+      "msg_id": "m44",
+      "sent_at": "2026-09-22T09:12:00Z",
+      "sender": {
+        "type": "user",
+        "user_id": 12345678
+      },
+      "content": "只运行测试并报告结果"
+    },
+    {
+      "msg_id": "m43",
+      "sent_at": "2026-09-22T09:11:00Z",
+      "sender": {
+        "type": "user",
+        "user_id": 12345678
+      },
+      "content": "更正，先不要发布"
+    }
+  ],
+  "next_cursor": "m43",
+  "remaining_count": 2
+}
 
-$ tbg --agent hopeful_morse history <topic> --cursor m43 --limit 2
-{"messages":[{"msg_id":"m42","sent_at":"2026-09-22T09:10:00Z","sender":{"type":"user","user_id":12345678},"content":"请发布最新版本"},{"msg_id":"m41","sent_at":"2026-09-22T09:09:00Z","sender":{"type":"user","user_id":12345678},"content":"帮我检查项目"}],"next_cursor":"m41","remaining_count":0}
+$ tbg --agent hopeful_morse history <topic> --cursor m43 --limit 2 | jq .
+{
+  "messages": [
+    {
+      "msg_id": "m42",
+      "sent_at": "2026-09-22T09:10:00Z",
+      "sender": {
+        "type": "user",
+        "user_id": 12345678
+      },
+      "content": "请发布最新版本"
+    },
+    {
+      "msg_id": "m41",
+      "sent_at": "2026-09-22T09:09:00Z",
+      "sender": {
+        "type": "user",
+        "user_id": 12345678
+      },
+      "content": "帮我检查项目"
+    }
+  ],
+  "next_cursor": "m41",
+  "remaining_count": 0
+}
 ```
 
 `remaining_count` 为 0 仅表示查询时该方向没有更多消息，不清空 cursor。每次调用重新查询，不固定整个分页过程的快照。保留 unread 的 cursor 可以继续读取后来到达的消息；history 反向续读不会返回更晚到达的消息，查看最新对话需省略 cursor 重新调用。
 
 ```text
 # 已读到 m44，尚未 ack，也没有新消息。
-$ tbg --agent hopeful_morse unread <topic> --cursor m44
-{"messages":[],"next_cursor":"m44","remaining_count":0}
+$ tbg --agent hopeful_morse unread <topic> --cursor m44 | jq .
+{
+  "messages": [],
+  "next_cursor": "m44",
+  "remaining_count": 0
+}
 
 # User 随后发来 m45；使用原 cursor 即可继续，不重读 m44。
-$ tbg --agent hopeful_morse unread <topic> --cursor m44
-{"messages":[{"msg_id":"m45","sent_at":"2026-09-22T09:13:00Z","sender":{"type":"user","user_id":12345678},"content":"请附上测试报告"}],"next_cursor":"m45","remaining_count":0}
+$ tbg --agent hopeful_morse unread <topic> --cursor m44 | jq .
+{
+  "messages": [
+    {
+      "msg_id": "m45",
+      "sent_at": "2026-09-22T09:13:00Z",
+      "sender": {
+        "type": "user",
+        "user_id": 12345678
+      },
+      "content": "请附上测试报告"
+    }
+  ],
+  "next_cursor": "m45",
+  "remaining_count": 0
+}
 ```
 
-空 Topic 且没有已知读取位置时返回 `{"messages":[],"next_cursor":null,"remaining_count":0}`。
+空 Topic 且没有已知读取位置时返回：
+
+```json
+{
+  "messages": [],
+  "next_cursor": null,
+  "remaining_count": 0
+}
+```
 
 管理交互（命令、菜单点击、Bot 的管理回复及操作结果）持久保存到 DB，但不进入 unread 或 history，也不计入待确认消息或 remaining_count，不触发 wait。
 
@@ -109,13 +236,17 @@ send 的 `--quote` 指向被回复的消息，正文中的 `@<name>` 表达希�
 
 ```text
 # calm_turing 已订阅，以下消息位于其消费边界之后。
-$ tbg --agent hopeful_morse send <topic> "@calm_turing 请复核测试结果"
-{"msg_id":"m51"}
+$ tbg --agent hopeful_morse send <topic> "@calm_turing 请复核测试结果" | jq .
+{
+  "msg_id": "m51"
+}
 
 $ tbg --agent calm_turing unread <topic>
 # 读完后续对话，再回复。
-$ tbg --agent calm_turing send <topic> "复核通过" --quote m51
-{"msg_id":"m52"}
+$ tbg --agent calm_turing send <topic> "复核通过" --quote m51 | jq .
+{
+  "msg_id": "m52"
+}
 
 Telegram Topic：
   hopeful_morse: @calm_turing 请复核测试结果
@@ -130,24 +261,37 @@ Reply 和 @ 都不建立私信或独占分配，其他 Agent 仍可读取同一�
 
 ```text
 # 已处理到 m44；m45 是自己的回复，m46 是 User 的新消息。
-$ tbg --agent hopeful_morse ack <topic> --through m44
-{"last_acked_msg_id":"m44"}
+$ tbg --agent hopeful_morse ack <topic> --through m44 | jq .
+{
+  "last_acked_msg_id": "m44"
+}
 
 $ tbg --agent hopeful_morse unread <topic>
 # 从 m45 开始，包含自己的回复和 User 的 m46。
 # 读取后中断、尚未 ack，消费边界不变。
-$ tbg --agent hopeful_morse subscriptions
-{"subscriptions":[{"topic":"<topic>","last_acked_msg_id":"m44"}]}
+$ tbg --agent hopeful_morse subscriptions | jq .
+{
+  "subscriptions": [
+    {
+      "topic": "<topic>",
+      "last_acked_msg_id": "m44"
+    }
+  ]
+}
 ```
 
 重复或较旧的 ack 成功返回当前边界，不回退进度。同一身份的多个 CLI 可以发送 ack：
 
 ```text
 # 同一 Topic 中，m50 位于 m45 之后。
-CLI A: tbg --agent hopeful_morse ack <topic> --through m50
-       {"last_acked_msg_id":"m50"}
-CLI B: tbg --agent hopeful_morse ack <topic> --through m45
-       {"last_acked_msg_id":"m50"}
+CLI A: tbg --agent hopeful_morse ack <topic> --through m50 | jq .
+       {
+         "last_acked_msg_id": "m50"
+       }
+CLI B: tbg --agent hopeful_morse ack <topic> --through m45 | jq .
+       {
+         "last_acked_msg_id": "m50"
+       }
 ```
 
 处理完成但 ack 之前中断时，消息仍待确认，恢复后可能重新处理；Agent 需考虑工作本身的重复执行。
@@ -161,7 +305,15 @@ wait 默认持续等待所有当前订阅的 Topic，`--topic` 限定一个已�
 一次唤起汇总等待范围内当前满足条件的 Topic，只返回定位信息，不附带正文：
 
 ```json
-{"topics":[{"topic":"<topic>","trigger_msg_id":"m44","pending_count":3}]}
+{
+  "topics": [
+    {
+      "topic": "<topic>",
+      "trigger_msg_id": "m44",
+      "pending_count": 3
+    }
+  ]
+}
 ```
 
 `trigger_msg_id` 是该 Topic 首条符合唤起条件的待确认消息；它说明唤起原因，unread 仍从消费边界之后读取完整对话。`pending_count` 统计该 Topic 的全部待确认消息，包含未触发唤起的对话，不包含自己的消息和管理记录。
@@ -173,14 +325,20 @@ Telegram Topic：
   [m43] User: 更正，先不要发布
   [m44] User: @hopeful_morse 请只运行测试
 
-$ tbg --agent hopeful_morse wait --topic <topic>
+$ tbg --agent hopeful_morse wait --topic <topic> | jq .
 # 返回上述结构：m44 触发唤起，但从 m42 开始读取。
 $ tbg --agent hopeful_morse unread <topic>
 # 读完后续对话，再执行最新要求并显式 ack。
 # 未 ack 时，再次 wait 仍立即返回符合条件的待确认消息。
 ```
 
-wait 不预留消息。返回值反映当时状态，其他 CLI 随后的 ack 或设置变更不会改写已返回的结果。超时且无符合条件的消息时返回 `{"topics":[]}`；主动取消结束本次等待。
+wait 不预留消息。返回值反映当时状态，其他 CLI 随后的 ack 或设置变更不会改写已返回的结果。主动取消结束本次等待。超时且无符合条件的消息时返回：
+
+```json
+{
+  "topics": []
+}
+```
 
 **同一 Agent 同时只能有一个 wait**，跨 CLI、跨 Topic 也一样。第二个调用报错，原等待继续；返回、超时、取消或出错结束后可重新等待，其他命令在等待期间仍可执行。
 
