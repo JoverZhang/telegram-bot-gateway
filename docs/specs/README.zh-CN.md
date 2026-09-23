@@ -2,21 +2,21 @@
 
 状态：规划中，接口草案，尚未实现。[English](README.md)
 
-Agent 使用 `tbg` CLI，User 使用 Telegram Bot。本文汇总两个入口的能力；通信场景和错误边界见[通信规范](communication.zh-CN.md)，管理状态与交互将在管理规范中继续收敛。
+Agent 使用 `tbg` CLI，User 使用 Telegram Bot。本文汇总两个入口的能力；通信场景和错误边界见[通信规范](communication.zh-CN.md)，管理状态与交互见[管理规范草案](operations.zh-CN.md)。
 
 ## CLI：tbg --help
 
-`tbg` 专供 Agent 使用。Agent 自助注册，获得自动生成的唯一名称；后续携带该名称操作。Agent 的内部 ID 不作为使用者需要管理的标识。同一名称在不同 CLI 中共享订阅、静音设置和 ack 进度，不同 Agent 的消费进度各自独立。
+`tbg` 专供 Agent 使用。Agent 自助注册，可指定名称；仅省略 `--name` 时自动生成。显式名称为空、非法或冲突时报错，不自动改写。注册成功后携带返回的唯一名称操作。Agent 的内部 ID 不作为使用者需要管理的标识。同一名称在不同 CLI 中共享订阅、静音设置和 ack 进度，不同 Agent 的消费进度各自独立。
 
 ```text
 tbg — Telegram Bot Gateway
 
 USAGE
-  tbg agent register
+  tbg agent register [--name <name>]
   tbg --agent <name> <command>
 
 IDENTITY
-  agent register                         注册并返回自动生成的唯一名称
+  agent register [--name <name>]          注册并返回名称；仅省略时自动生成
   whoami                                 查看当前 Agent 身份
   agent list                             查看 Agent 及参与状态
 
@@ -112,6 +112,6 @@ User 在 Topic 中发言、Reply 或 @ Agent。查询与管理统一从 `/manage
 | 文件 | 职责 |
 |---|---|
 | [communication.zh-CN.md](communication.zh-CN.md) | Agent CLI 与 Telegram User 的通信场景：订阅、发送、读取、ack、wait、Reply/@、暂离与恢复。 |
-| `operations.zh-CN.md`（待编写） | 注册与身份、Bot 配置、User 信任、Group/Topic 管理、菜单交互、Doctor、状态及语言设置。 |
+| [operations.zh-CN.md](operations.zh-CN.md)（讨论草案） | 注册与身份、Bot 配置、User 信任、Group/Topic 管理、菜单交互、Doctor、状态及语言设置。 |
 
 本轮先收敛 CLI 操作与 Telegram 交互。CLI → Gateway → Telegram 的职责、传输方式和状态存储留给后续架构文档。历史检索与 Checkpoint 暂不设计。
