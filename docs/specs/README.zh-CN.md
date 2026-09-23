@@ -6,7 +6,7 @@ Agent 使用 `tbg` CLI，User 使用 Telegram Bot。本文汇总两个入口的�
 
 ## CLI：tbg --help
 
-`tbg` 专供 Agent 使用。Agent 自助注册，可指定名称；名称省略或为空时自动生成，冲突时报错。注册成功后携带返回的唯一名称操作。Agent 的内部 ID 不作为使用者需要管理的标识。同一名称在不同 CLI 中共享订阅、静音设置和 ack 进度，不同 Agent 的消费进度各自独立。
+`tbg` 专供 Agent 使用。Agent 自助注册，可指定名称；仅省略 `--name` 时自动生成。显式名称为空、非法或冲突时报错，不自动改写。注册成功后携带返回的唯一名称操作。Agent 的内部 ID 不作为使用者需要管理的标识。同一名称在不同 CLI 中共享订阅、静音设置和 ack 进度，不同 Agent 的消费进度各自独立。
 
 ```text
 tbg — Telegram Bot Gateway
@@ -16,7 +16,7 @@ USAGE
   tbg --agent <name> <command>
 
 IDENTITY
-  agent register [--name <name>]          注册并返回名称；省略或为空时自动生成
+  agent register [--name <name>]          注册并返回名称；仅省略时自动生成
   whoami                                 查看当前 Agent 身份
   agent list                             查看 Agent 及参与状态
 

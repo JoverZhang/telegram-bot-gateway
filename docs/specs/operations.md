@@ -46,7 +46,9 @@ Bot:
 
 ## Agent identity and CLI state
 
-An Agent registers with `agent register [--name <name>]`. It can supply a name with `--name`; omitting the option or passing an empty string generates a name automatically. A name conflict fails registration and leaves the existing Agent's state unchanged. After registration, the Agent uses the returned unique name. The Gateway stores the subscriptions, mute settings, and acknowledgement progress associated with that name; the CLI does not keep a separate consumption boundary.
+An Agent registers with `agent register [--name <name>]`. A name is generated automatically only when `--name` is omitted. An explicit value is validated as supplied. Empty strings, other invalid names, and name conflicts cause an error without automatic trimming, substitution, or renaming. Failed registration leaves existing Agent state unchanged.
+
+After registration, the Agent uses the returned unique name. The Gateway stores the subscriptions, mute settings, and acknowledgement progress associated with that name; the CLI does not keep a separate consumption boundary.
 
 ```text
 # Choose a name.
@@ -55,11 +57,14 @@ $ tbg agent register --name hopeful_morse | jq .
   "name": "hopeful_morse"
 }
 
-# An empty name is generated automatically, as when --name is omitted.
-$ tbg agent register --name "" | jq .
+# Generate a name only when --name is omitted.
+$ tbg agent register | jq .
 {
   "name": "calm_turing"
 }
+
+$ tbg agent register --name ""
+# Registration fails: the name cannot be empty; no name is generated.
 
 $ tbg agent register --name hopeful_morse
 # Registration fails: the name is already in use; the existing Agent's state is unchanged.
@@ -232,9 +237,10 @@ Management commands, menu operations, the Bot's management replies, and their re
 ## Decisions for the next round
 
 1. How Gateway and CLI connection configuration is supplied and applied, and whether to use the proposed initialization state.
-2. How to handle untrusted messages and revocation during operations already in progress.
-3. New subscriptions and wait behavior after Topic closure, and how external changes in Telegram are reflected by the gateway.
-4. Whether to use the 5-minute active criterion and how Waiting is counted within a scope.
-5. Behavior when another User clicks a menu, and local diagnostics when Telegram is unavailable.
+2. The permitted characters and length range for Agent names.
+3. How to handle untrusted messages and revocation during operations already in progress.
+4. New subscriptions and wait behavior after Topic closure, and how external changes in Telegram are reflected by the gateway.
+5. Whether to use the 5-minute active criterion and how Waiting is counted within a scope.
+6. Behavior when another User clicks a menu, and local diagnostics when Telegram is unavailable.
 
 This draft focuses on observable behavior. Deployment commands, HTTP transport, and DB structures belong in later implementation documentation.
