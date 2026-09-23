@@ -208,9 +208,9 @@ Diagnostics should distinguish satisfied permission requirements from successful
 Language settings are saved per User and follow Telegram by default, with a manual override. Menus use the opener's language. A missing language field retains the last recorded value; if a supported language cannot be selected, the interface falls back to English. Names and conversation bodies retain their original text.
 
 ```text
-/manage → [Personal settings] → [Language]
-Current: Follow Telegram (简体中文)
-[Follow Telegram] [简体中文] [English]
+/manage → [个人设置] → [语言]
+当前：跟随 Telegram（简体中文）
+[跟随 Telegram] [简体中文] [English]
 
 User selects: [English]
 Language: English
