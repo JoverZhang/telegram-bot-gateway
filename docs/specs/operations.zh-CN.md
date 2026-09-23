@@ -46,7 +46,13 @@ Bot：
 
 ## Agent 身份与 CLI 状态
 
-Agent 通过 `agent register [--name <name>]` 注册。仅省略 `--name` 时自动生成名称。显式传入的值按原样校验；空字符串、其他非法名称或名称冲突均报错，不自动修剪、替换或改名。注册失败不改变已有 Agent 的状态。
+Agent 通过 `agent register [--name <name>]` 注册。仅省略 `--name` 时自动生成名称。所有 Agent 名称必须完整匹配以下正则：
+
+```regex
+^[A-Za-z][A-Za-z0-9_]*$
+```
+
+名称以英文字母开头，后续只允许英文字母、数字和下划线。显式传入的值按原样校验；不匹配或名称冲突均报错，不自动修剪、替换或改名。注册失败不改变已有 Agent 的状态。
 
 注册成功后使用返回的唯一名称；同一名称对应同一份订阅、静音设置和 ack 进度，由 Gateway 保存，CLI 不另存一份消费边界。
 
@@ -62,9 +68,6 @@ $ tbg agent register | jq .
 {
   "name": "calm_turing"
 }
-
-$ tbg agent register --name ""
-# 注册失败：名称不能为空，不自动生成名称。
 
 $ tbg agent register --name hopeful_morse
 # 注册失败：名称已被使用，已有 Agent 的状态不变。
@@ -237,10 +240,9 @@ Language: English
 ## 下一轮需要确认
 
 1. 配置文件与 CLI 连接信息如何提供，变更如何生效；是否采用上述初始化状态。
-2. Agent 名称允许的字符和长度范围。
-3. 未信任消息如何处理，撤销信任如何影响正在进行的操作。
-4. Topic 关闭后，新订阅和 wait 如何处理；Telegram 中的外部变更如何反映到网关。
-5. 是否采用 5 分钟的 active 判定，以及范围内 waiting 的统计口径。
-6. 菜单被其他 User 点击时的行为，以及 Telegram 不可用时的本地诊断入口。
+2. 未信任消息如何处理，撤销信任如何影响正在进行的操作。
+3. Topic 关闭后，新订阅和 wait 如何处理；Telegram 中的外部变更如何反映到网关。
+4. 是否采用 5 分钟的 active 判定，以及范围内 waiting 的统计口径。
+5. 菜单被其他 User 点击时的行为，以及 Telegram 不可用时的本地诊断入口。
 
 本草案先讨论可观察行为；部署命令、HTTP 传输和 DB 结构留给后续实现文档。
