@@ -2,11 +2,13 @@
 
 Status: planned interface draft; not implemented. [简体中文](README.zh-CN.md)
 
-Agents use the `tbg` CLI; Users use the Telegram Bot. This document summarizes the capabilities of both interfaces. See the [communication specification](communication.md) for conversation scenarios and failure boundaries, and the [operations draft](operations.md) for management states and interactions.
+Agents use the `tbg` CLI; Users use the Telegram Bot. This document summarizes the capabilities of both interfaces. See the [communication specification](communication.md) for conversation scenarios and failure boundaries, and the [operations specification](operations.md) for configuration, management states, and interactions.
 
 ## CLI: tbg --help
 
 `tbg` is for Agents only. An Agent can choose a name when registering. A name is generated automatically only when `--name` is omitted. An explicitly empty, invalid, or conflicting name fails registration without being rewritten. After registration, the Agent uses the returned unique name for subsequent operations. Agents do not need to manage their internal IDs. CLI invocations using the same name share subscriptions, mute settings, and acknowledgement progress. Different Agents have independent consumption progress.
+
+The Client and Server communicate over HTTP, each using one global YAML configuration file per operating-system user. The Client's connection port and the Server's listening port must both be explicitly configured. See the operations specification for paths and when changes take effect.
 
 ```text
 tbg — Telegram Bot Gateway
@@ -103,7 +105,9 @@ Administrators can access global management in a private chat with the Bot. The 
 
 Subpages provide a back button, and filter buttons update the displayed list. Users are either administrators or regular trusted Users. Administrators manage the trust list, Group connections, and all Topics. Regular trusted Users participate in conversations and view relevant status.
 
-For initial setup, the User obtains their user_id through `/whoami` and adds it to the administrator list in the configuration file. Administrators can then grant or revoke trust for regular Users directly through the menu. When an administrator adds the Bot to a Group, the gateway registers the Group automatically. Doctor shows available capabilities and missing permissions.
+For initial setup, the User obtains their user_id through `/whoami`, adds it to the administrator list in the Server configuration, and manually restarts the Gateway. Administrators can then grant or revoke trust for regular Users directly through the menu. Ordinary messages from untrusted Users are ignored and not stored. Revocation affects only new messages and requests received after it takes effect; previously received history and consumption progress are preserved.
+
+When a Gateway administrator adds the Bot to a Group, the gateway registers the Group automatically. After an invitation from another User, a Gateway administrator completes the connection by entering `/manage` in that Group. Only the User who opened a menu can operate it. Doctor shows available capabilities and missing permissions.
 
 Language settings are stored per User. They follow the User's Telegram language by default and can be overridden manually. If the language field is missing, the last recorded language is used; if a supported language cannot be selected, the interface falls back to English. The menu uses the language of the User who opened it. Localization covers menus, buttons, prompts, and diagnostics; names and conversation content retain their original text. Language selection follows [Telegram's language support guidance](https://core.telegram.org/bots/features#language-support).
 
@@ -112,6 +116,6 @@ Language settings are stored per User. They follow the User's Telegram language 
 | File | Responsibility |
 |---|---|
 | [communication.md](communication.md) | Communication scenarios for the Agent CLI and Telegram Users: subscriptions, sending, reading, ack, wait, Reply/@, leaving temporarily, and resuming. |
-| [operations.md](operations.md) (discussion draft) | Registration and identity, Bot configuration, User trust, Group/Topic management, menu interactions, Doctor, status, and language settings. |
+| [operations.md](operations.md) | Registration and identity, Client/Server configuration, User trust, Group/Topic management, menu interactions, Doctor, status, and language settings. |
 
-This round focuses on CLI operations and Telegram interactions. Responsibilities across CLI → Gateway → Telegram, transport, and state storage are deferred to the architecture documentation. History search and Checkpoint design are outside this stage.
+HTTP API request and response contracts still need to be specified. Internal responsibilities across CLI → Gateway → Telegram, transport implementation, and state storage are deferred to docs/how. History search and Checkpoint design are outside this stage.

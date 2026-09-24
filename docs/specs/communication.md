@@ -374,4 +374,4 @@ A call with `--topic` stays restricted to that Topic and immediately applies its
 
 Subscriptions, mute settings, and consumption boundaries survive CLI or gateway restarts; waiting must be started again.
 
-Topic closure and reopening, trust permissions, access to management records, and active-state definitions will be refined in the operations specification. DB structures and transport implementation belong in later architecture documents.
+See the [operations specification](operations.md) for Topic closure and reopening, trust permissions, and active-state definitions. DB structures and transport implementation belong in later architecture documents.
