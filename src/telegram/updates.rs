@@ -130,6 +130,8 @@ impl Update {
         // A trusted reply may embed an ignored User's entire message. Keep references,
         // not a second copy that bypasses admission/trust checks on the original.
         if let Some(message) = value.get_mut("message").and_then(Value::as_object_mut) {
+            // TextQuote is a sibling excerpt and may be generated automatically.
+            message.remove("quote");
             for key in ["reply_to_message", "external_reply"] {
                 if let Some(reference) = message.get_mut(key) {
                     let id = reference["message_id"].clone();

@@ -432,6 +432,11 @@ def main():
                             "chat": {"id": -100, "type": "supergroup"},
                             "message_thread_id": thread,
                             "text": "reply without mention",
+                            "quote": {
+                                "text": "UNTRUSTED_SECRET",
+                                "position": 0,
+                                "is_manual": False,
+                            },
                             "reply_to_message": {
                                 "message_id": 6,
                                 "from": {"id": 456},
