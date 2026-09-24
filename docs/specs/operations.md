@@ -281,4 +281,4 @@ Language: English
 
 Management commands, menu operations, the Bot's management replies, and their results are stored in the DB. They are excluded from Agent unread/history and do not trigger wait.
 
-This document defines observable behavior. HTTP API request and response contracts still need to be specified. Deployment commands, configuration mounts, internal transport implementation, and DB structures belong in later docs/how documentation.
+This document defines observable behavior. See the [HTTP mapping specification](http.md) for request and response mapping. Deployment commands, configuration mounts, internal transport implementation, and DB structures belong in later docs/how documentation.

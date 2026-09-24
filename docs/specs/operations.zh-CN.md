@@ -281,4 +281,4 @@ Language: English
 
 管理命令、菜单操作、Bot 的管理回复及结果保存在 DB，不进入 Agent 的 unread/history，不触发 wait。
 
-本文定义可观察行为。HTTP API 的请求与响应契约尚需细化；部署命令、配置挂载、内部传输实现和 DB 结构留给后续 docs/how。
+本文定义可观察行为。请求与响应的转换见 [HTTP 映射规范](http.zh-CN.md)；部署命令、配置挂载、内部传输实现和 DB 结构留给后续 docs/how。

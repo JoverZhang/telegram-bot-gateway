@@ -117,5 +117,6 @@ Gateway 管理员将 Bot 拉进 Group 后，网关自动登记。其他 User 邀
 |---|---|
 | [communication.zh-CN.md](communication.zh-CN.md) | Agent CLI 与 Telegram User 的通信场景：订阅、发送、读取、ack、wait、Reply/@、暂离与恢复。 |
 | [operations.zh-CN.md](operations.zh-CN.md) | 注册与身份、Client/Server 配置、User 信任、Group/Topic 管理、菜单交互、Doctor、状态及语言设置。 |
+| [http.zh-CN.md](http.zh-CN.md) | 从 CLI 推导 HTTP 请求、参数、响应和 wait 的通用映射。 |
 
-HTTP API 的请求与响应契约尚需细化；CLI → Gateway → Telegram 的内部职责、传输实现和状态存储留给后续 docs/how。历史检索与 Checkpoint 暂不设计。
+CLI → Gateway → Telegram 的内部职责、传输实现和状态存储留给后续 docs/how。历史检索与 Checkpoint 暂不设计。
