@@ -8,7 +8,7 @@ Agents use the `tbg` CLI; Users use the Telegram Bot. This document summarizes t
 
 `tbg` is for Agents only. An Agent can choose a name when registering. A name is generated automatically only when `--name` is omitted. An explicitly empty, invalid, or conflicting name fails registration without being rewritten. After registration, the Agent uses the returned unique name for subsequent operations. Agents do not need to manage their internal IDs. CLI invocations using the same name share subscriptions, mute settings, and acknowledgement progress. Different Agents have independent consumption progress.
 
-The Client and Server communicate over HTTP on port `18473` by default, each using one global YAML configuration file per operating-system user. See the operations specification for paths and when changes take effect.
+The Client and Server communicate over HTTP, each using one global YAML configuration file per operating-system user. The Client's connection port and the Server's listening port must both be explicitly configured. See the operations specification for paths and when changes take effect.
 
 ```text
 tbg — Telegram Bot Gateway

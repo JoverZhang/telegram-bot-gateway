@@ -6,15 +6,15 @@ This document describes setting up the communication environment, managing parti
 
 ## Initial setup and administrator identity
 
-The Client and Server communicate over HTTP and each use one global YAML configuration file per operating-system user. `~` refers to the home directory of the user running the respective program. All projects and Agents running as that user share the Client configuration; Agent identity is still selected with `--agent <name>`.
+The Client and Server communicate over HTTP and each use one global YAML configuration file per operating-system user. `~` refers to the home directory of the user running the respective program. All projects and Agents running as that user share the Client configuration; Agent identity is still selected with `--agent <name>`. Both sides require explicitly configured ports; `18473` below is only an example value.
 
 ```yaml
 # ~/.config/tbg/client.yaml
 host: "127.0.0.1"
-# port: 18473
+port: 18473
 ```
 
-The Client supplies the Gateway's IP address; `port` is optional and defaults to `18473`. Each CLI invocation reads the file. A running wait keeps its original connection. This example connects to `http://127.0.0.1:18473`.
+The Client must explicitly supply the Gateway's IP address (`host`) and `port`. If either is missing, the CLI reports a configuration error without attempting a connection. Each CLI invocation reads the file. A running wait keeps its original connection. This example connects to `http://127.0.0.1:18473`.
 
 ```yaml
 # ~/.config/tbg/server.yaml
@@ -25,7 +25,7 @@ admins:
   - 12345678
 ```
 
-The Server listens on `0.0.0.0:18473` by default; `listen` can override it. Configuration changes take effect after manually restarting the Gateway. If the port is occupied, startup fails and reports the listening address without selecting another port. When using a custom port, update the Client's `port` as well.
+The Server must explicitly specify its listening IP address and port through `listen`; missing configuration prevents startup. Configuration changes take effect after manually restarting the Gateway. If the port is occupied, startup fails and reports the listening address without selecting another port. The Client's `port` identifies the port at which the Gateway is actually exposed to clients.
 
 A User's administrator identity comes from the Server configuration. The Bot's group administrator permissions are granted through Telegram's group settings. The User first configures the Bot token, obtains their user_id through `/whoami` in a private chat with the Bot, then adds it to the administrator list and manually restarts the Gateway.
 

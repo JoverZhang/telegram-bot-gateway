@@ -6,15 +6,15 @@
 
 ## 首次启动与管理员身份
 
-Client 与 Server 通过 HTTP 通信，各使用一份用户级全局 YAML 配置。`~` 指运行相应程序的系统用户主目录；同一系统用户下的所有项目和 Agent 共用 Client 配置，Agent 身份仍通过 `--agent <name>` 指定。
+Client 与 Server 通过 HTTP 通信，各使用一份用户级全局 YAML 配置。`~` 指运行相应程序的系统用户主目录；同一系统用户下的所有项目和 Agent 共用 Client 配置，Agent 身份仍通过 `--agent <name>` 指定。两端的端口都必须显式配置，以下 `18473` 仅为示例值。
 
 ```yaml
 # ~/.config/tbg/client.yaml
 host: "127.0.0.1"
-# port: 18473
+port: 18473
 ```
 
-Client 填写 Gateway 的 IP；`port` 可省略，默认为 `18473`。CLI 每次调用读取该文件，已经运行的 wait 保持原连接。本例连接 `http://127.0.0.1:18473`。
+Client 必须显式填写 Gateway 的 IP（`host`）和 `port`；缺少任一项时报配置错误，不发起连接。CLI 每次调用读取该文件，已经运行的 wait 保持原连接。本例连接 `http://127.0.0.1:18473`。
 
 ```yaml
 # ~/.config/tbg/server.yaml
@@ -25,7 +25,7 @@ admins:
   - 12345678
 ```
 
-Server 默认监听 `0.0.0.0:18473`，允许通过 `listen` 覆盖；修改配置后手动重启 Gateway 生效。端口被占用时启动失败并报告监听地址，不自动换端口。使用自定义端口时，同时修改 Client 的 `port`。
+Server 必须通过 `listen` 显式指定监听 IP 和端口，缺少时启动失败；修改配置后手动重启 Gateway 生效。端口被占用时启动失败并报告监听地址，不自动换端口。Client 的 `port` 填写 Gateway 实际对外提供的端口。
 
 User 的管理员身份来自 Server 配置；Bot 的群管理员权限由 Telegram 群设置授予。User 先配置 Bot token，通过私聊 Bot 的 `/whoami` 获取自己的 user_id，再写入管理员名单并手动重启 Gateway。
 

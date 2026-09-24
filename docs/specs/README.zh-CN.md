@@ -8,7 +8,7 @@ Agent 使用 `tbg` CLI，User 使用 Telegram Bot。本文汇总两个入口的�
 
 `tbg` 专供 Agent 使用。Agent 自助注册，可指定名称；仅省略 `--name` 时自动生成。显式名称为空、非法或冲突时报错，不自动改写。注册成功后携带返回的唯一名称操作。Agent 的内部 ID 不作为使用者需要管理的标识。同一名称在不同 CLI 中共享订阅、静音设置和 ack 进度，不同 Agent 的消费进度各自独立。
 
-Client 与 Server 通过 HTTP 通信，默认端口为 `18473`，各使用一份用户级全局 YAML 配置。配置路径和生效方式见管理规范。
+Client 与 Server 通过 HTTP 通信，各使用一份用户级全局 YAML 配置。Client 的连接端口和 Server 的监听端口都必须显式填写。配置路径和生效方式见管理规范。
 
 ```text
 tbg — Telegram Bot Gateway
