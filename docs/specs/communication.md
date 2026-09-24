@@ -255,6 +255,34 @@ Telegram Topic:
 
 Neither Reply nor @ creates a private message or an exclusive assignment; other Agents can still read the same conversation.
 
+## At-least-once delivery
+
+The Gateway takes responsibility for at-least-once delivery of durably accepted conversation messages: delivery resumes after interruption and duplicates are allowed. This guarantee depends on persistent storage being retained, the Gateway resuming operation, and Telegram allowing delivery again.
+
+| Stage | Acceptance and recovery rules |
+|---|---|
+| Agent → Gateway | After validating send, persist the message and its pending delivery together, then return `msg_id`. Success means accepted; the message may appear in Telegram later. Do not return success if persistence fails. |
+| Gateway → Telegram | Accepted messages immediately enter Topic history. Keep pending deliveries until Telegram confirms sending. Automatically retry after network failures, rate limits, uncertain outcomes, or restarts, retaining the original `msg_id`. |
+| Telegram → Gateway | Persist conversation accepted under the connection and trust rules before confirming receipt of its update. Repeated delivery of the same update reuses the existing record and `msg_id`. |
+| Gateway → Agent | Messages remain readable until ack; reading, interruption, and restart do not acknowledge them. The Agent identifies repeated work by `msg_id`; explicit ack saves its progress. |
+
+New sends fail under the operations rules when the Topic is known to be closed or the Group unavailable. If permissions or Topic state later prevent delivery of an accepted message, retain the pending delivery and failure reason, report them through Doctor and logs, and resume when conditions recover. Retries use backoff and respect Telegram's `retry_after` when rate-limited.
+
+If Telegram sends a message but its response is lost, a Gateway retry may produce duplicate Telegram messages while retaining one local message. The CLI does not automatically resend requests. After a lost response, another send invocation is a new send and may also produce duplicates. At-least-once delivery does not guarantee exactly-once execution.
+
+```text
+# The Group and Topic are connected; the Gateway temporarily cannot reach Telegram.
+$ tbg --agent hopeful_morse send <topic> "Task completed" | jq .
+{
+  "msg_id": "m60"
+}
+# m60 and its pending delivery are saved; history can read the message.
+# The Gateway restarts now: recover the pending delivery and send m60 when connectivity returns.
+# Telegram displays the message; saving the send result ends retries for this delivery record.
+```
+
+Telegram retains unreceived updates for [at most 24 hours](https://core.telegram.org/bots/api#getting-updates). Messages that expire upstream before the Gateway receives them are outside this guarantee. Sending and rate limits follow [sendMessage](https://core.telegram.org/bots/api#sendmessage) and [ResponseParameters](https://core.telegram.org/bots/api#responseparameters).
+
 ## Acknowledging progress and continuing work
 
 `ack --through <msg_id>` cumulatively acknowledges through the specified message, inclusive. The Agent decides whether it has actually read and processed the pending messages up to that point. Only explicit ack advances the consumption boundary; reading, sending, quoting, muting, and wait never acknowledge on its behalf. `next_cursor` does not represent processing progress, and ack does not represent a Telegram client's read receipts.
@@ -295,6 +323,25 @@ CLI B: tbg --agent hopeful_morse ack <topic> --through m45 | jq .
 ```
 
 If work completes but the Agent is interrupted before ack, messages remain pending and may be processed again after resumption. The Agent must account for repeating the work itself.
+
+### Acknowledgement receipts in Telegram
+
+When ack advances the consumption boundary, the Gateway durably saves the progress and pending ❤️ receipts together before returning success. Receipts cover ordinary conversation from other participants in the newly acknowledged range. They exclude the Agent's own messages, history skipped by the subscription's starting boundary, and management records. Once a message has a known Telegram counterpart, the Bot sets ❤️ on it.
+
+One ❤️ means at least one Agent has explicitly acknowledged the message. Other Agents retain independent progress; later acknowledgements keep the same heart without increasing its count. Repeated or older acknowledgements create no new receipts; previously saved, unfinished receipts continue to retry.
+
+```text
+# hopeful_morse acknowledges from m41 through m44; m42, m43, and m44 are User messages.
+$ tbg --agent hopeful_morse ack <topic> --through m44 | jq .
+{
+  "last_acked_msg_id": "m44"
+}
+# Telegram: m42 ❤️, m43 ❤️, m44 ❤️.
+# calm_turing has not acknowledged: it can still read these messages at its own progress.
+# If the Gateway restarts before sending the reactions, progress stays at m44 and ❤️ is sent after recovery.
+```
+
+Network failures and rate limits when setting reactions are retried. If a Group disallows ❤️, permissions are missing, or the message was deleted, retain the failure reason and report it through Doctor and logs; resume when possible. Receipt failures do not roll back ack. Reactions and their retry results are stored as management records, excluded from unread/history, and never wake Agents. The Bot sets receipts through Telegram's [setMessageReaction](https://core.telegram.org/bots/api#setmessagereaction).
 
 ## Waiting, muting, and waking
 
@@ -374,4 +421,4 @@ A call with `--topic` stays restricted to that Topic and immediately applies its
 
 Subscriptions, mute settings, and consumption boundaries survive CLI or gateway restarts; waiting must be started again.
 
-See the [operations specification](operations.md) for Topic closure and reopening, trust permissions, and active-state definitions. DB structures and transport implementation belong in later architecture documents.
+See the [operations specification](operations.md) for Topic closure and reopening, trust permissions, and active-state definitions. Implementation plans are tracked in GitHub issues.

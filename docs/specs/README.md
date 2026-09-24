@@ -67,6 +67,8 @@ A Topic is a shared conversation space. Reply preserves the relationship between
 
 Unread and history return at most 20 messages by default. `--cursor` excludes the specified message and continues in the command's reading direction. Each message includes its `msg_id`, sending time, sender, and full content. Agents should read the subsequent conversation before responding and explicitly acknowledge messages they have processed; reading and sending never acknowledge automatically. See the [communication specification](communication.md) for message fields, pagination responses, subscription resumption, and wait scenarios.
 
+Durably accepted messages use at-least-once delivery. A successful `send` means the Gateway has stored the message and taken responsibility for delivery. After an explicit Agent ack, the Bot adds ❤️ to the corresponding Telegram messages, meaning at least one Agent has acknowledged them. Delivery retries and receipt failures follow the communication specification.
+
 ## Telegram Bot: /help
 
 Users speak in Topics, reply to messages, and @ Agents. Queries and management actions share a single `/manage` entry point with buttons. Available actions depend on the current location and the User's permissions.
@@ -119,4 +121,4 @@ Language settings are stored per User. They follow the User's Telegram language 
 | [operations.md](operations.md) | Registration and identity, Client/Server configuration, User trust, Group/Topic management, menu interactions, Doctor, status, and language settings. |
 | [http.md](http.md) | Shared rules deriving HTTP requests, parameters, responses, and wait from the CLI. |
 
-Internal responsibilities across CLI → Gateway → Telegram, transport implementation, and state storage are deferred to docs/how. History search and Checkpoint design are outside this stage.
+Implementation proposals and temporary plans are tracked in [GitHub issues](https://github.com/JoverZhang/telegram-bot-gateway/issues); docs retain intent and behavior specifications. History search and Checkpoint design are outside this stage.

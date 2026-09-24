@@ -49,7 +49,7 @@ $ tbg --agent hopeful_morse send <topic> "@calm_turing 请复核结果" --quote 
 }
 ```
 
-CLI 将错误说明写入 stderr，并以非零状态退出；未收到完整 HTTP 响应时报告连接或读取失败。CLI 不自动重试，调用方不能将响应缺失视为命令未执行。
+CLI 将错误说明写入 stderr，并以非零状态退出；未收到完整 HTTP 响应时报告连接或读取失败。CLI 不自动重试，调用方不能将响应缺失视为命令未执行。Gateway 对已持久接收消息的投递重试，遵循[通信规范](communication.zh-CN.md)。
 
 ## wait
 
@@ -57,4 +57,4 @@ wait 保持一次 HTTP 请求，直到通信规范中的结束条件满足；省
 
 客户端取消请求或连接中断后，Gateway 在检测到请求断开时结束该 wait，释放该 Agent 的等待位置，不自动 ack。其他命令仍按各自规则执行。
 
-`agent` 只选择参与者身份，不能作为访问凭据；HTTP 接入鉴权仍需单独约定。
+HTTP 接口不做鉴权，不要求访问 token。能够连接 Gateway 的调用方可以注册 Agent，并通过 `agent` 选择已注册身份；Telegram User 的信任规则仍按管理规范执行。
