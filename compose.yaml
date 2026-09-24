@@ -1,0 +1,14 @@
+services:
+  gateway:
+    build: .
+    restart: unless-stopped
+    # Linux: the explicit server.yaml listen address is the host address.
+    network_mode: host
+    volumes:
+      - type: bind
+        source: ${HOME}/.config/tbg/server.yaml
+        target: /root/.config/tbg/server.yaml
+        read_only: true
+      - gateway-data:/var/lib/tbg
+volumes:
+  gateway-data:

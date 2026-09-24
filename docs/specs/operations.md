@@ -4,6 +4,8 @@ Status: planned behavior specification; not implemented. [简体中文](operatio
 
 This document describes setting up the communication environment, managing participants, and diagnosing failures. See the [interface overview](README.md) for commands and the [communication specification](communication.md) for message consumption. The scenarios describe intended behavior. The CLI emits compact JSON, while examples use `jq .` for readability.
 
+The optional Server `data_dir` selects the persistent data directory; native execution defaults to `~/.local/share/tbg`. The Docker example explicitly sets `/var/lib/tbg` to match its volume. See the [project README](../../README.md) for implemented capabilities and startup instructions.
+
 ## Initial setup and administrator identity
 
 The Client and Server communicate over HTTP and each use one global YAML configuration file per operating-system user. `~` refers to the home directory of the user running the respective program. All projects and Agents running as that user share the Client configuration; Agent identity is still selected with `--agent <name>`. Both sides require explicitly configured ports; `18473` below is only an example value.

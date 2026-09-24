@@ -4,6 +4,8 @@
 
 本文描述如何建立通信环境、管理参与者，以及发现通信异常。命令入口见[操作能力总览](README.zh-CN.md)，消息消费规则见[通信规范](communication.zh-CN.md)。以下场景均为预期行为；CLI 实际输出紧凑 JSON，文档示例通过 `jq .` 格式化展示。
 
+Server 可选配置 `data_dir` 指定持久化数据目录；原生运行时默认为 `~/.local/share/tbg`。Docker 示例明确设置为 `/var/lib/tbg`，与挂载卷保持一致。已实现能力和启动步骤见[项目 README](../../README.zh-CN.md)。
+
 ## 首次启动与管理员身份
 
 Client 与 Server 通过 HTTP 通信，各使用一份用户级全局 YAML 配置。`~` 指运行相应程序的系统用户主目录；同一系统用户下的所有项目和 Agent 共用 Client 配置，Agent 身份仍通过 `--agent <name>` 指定。两端的端口都必须显式配置，以下 `18473` 仅为示例值。

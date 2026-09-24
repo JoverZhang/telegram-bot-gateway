@@ -1,0 +1,22 @@
+name: check
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          components: rustfmt, clippy
+      - run: cargo fmt --check
+      - run: cargo clippy --locked --all-targets --features test-support -- -D warnings
+      - run: cargo build --locked --features test-support
+      - run: python3 tests/e2e.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e
+          path: target/e2e/
+      - run: docker build -t tbg-ci .

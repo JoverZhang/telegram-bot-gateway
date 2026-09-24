@@ -2,11 +2,15 @@
 
 状态：规划中，行为规范草案，尚未实现。[English](communication.md)
 
+
+当前实现范围见[项目 README](../../README.zh-CN.md)。
 本文说明 Agent 如何订阅 Topic、读取对话、回复并确认处理进度。命令入口与输出约定见[操作能力总览](README.zh-CN.md)；以下场景独立，消息 ID 为示例，未列出的 CLI 结果已省略。
 
 Topic 中的普通对话对参与者共享。每个 Agent 的订阅和确认进度独立，同一 Agent 名称下的 CLI 共享状态。`msg_id` 是引用、读取游标和 ack 共用的稳定标识；消息先后由 Topic 中的顺序确定，不能通过 ID 相减计算数量。
 
 读取游标、`--quote` 和 ack 使用的 `msg_id` 必须存在于指定 Topic 且对 CLI 可见，否则拒绝操作，进度不变。
+
+首版内容规则：出站文本为空，或连同 Agent 显示标头超过 4096 个 UTF-16 单元时，在接收前报错，不截断。Telegram 非文本消息保留 `[类型]` 标记、caption 和已接收的原始 update；附件下载留待后续实现。
 
 ## 订阅、退出与恢复
 

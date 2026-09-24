@@ -2,11 +2,15 @@
 
 Status: planned behavior specification draft; not implemented. [简体中文](communication.zh-CN.md)
 
+
+Current implementation coverage is listed in the [project README](../../README.md).
 This document explains how Agents subscribe to Topics, read conversations, reply, and acknowledge processing progress. See the [interface overview](README.md) for the command catalog and output conventions. Scenarios are independent, message IDs are examples, and CLI results not shown are omitted.
 
 Ordinary conversation in a Topic is shared among its participants. Each Agent has independent subscriptions and acknowledgement progress; CLI invocations using the same Agent name share that state. `msg_id` is a stable identifier shared by references, reading cursors, and ack. Ordering comes from the Topic's message sequence; subtracting IDs does not give a message count.
 
 A `msg_id` used as a reading cursor, `--quote`, or ack must exist in the specified Topic and be CLI-visible. Otherwise, the operation is rejected and progress stays unchanged.
+
+First-flow content policy: reject outbound text before acceptance if it is empty or exceeds 4096 UTF-16 units including the Agent display header; never truncate it. For non-text Telegram messages, retain a `[type]` marker, any caption and the accepted raw update. Attachment download is deferred.
 
 ## Subscribing, leaving, and resuming
 
