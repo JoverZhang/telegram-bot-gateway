@@ -328,7 +328,7 @@ CLI B: tbg --agent hopeful_morse ack <topic> --through m45 | jq .
 
 ack 推进消费边界时，Gateway 同时持久保存进度和待发送的 ❤️ 回执，随后返回成功。回执覆盖本次新确认范围内、来自其他参与者的普通对话；自身发言、订阅起点之前跳过的历史和管理记录不添加回执。消息有已知的 Telegram 对应消息后，由 Bot 设置 ❤️。
 
-一颗 ❤️ 表示至少一个 Agent 已显式 ack。其他 Agent 的进度仍独立；后续 ack 继续保持同一颗心，不增加计数。重复或较旧的 ack 不产生新回执，已保存但尚未完成的回执继续重试。
+Bot 的 ❤️ 表示至少一个 Agent 已显式 ack。其他 Agent 的进度仍独立；后续 ack 继续保持 Bot 的同一颗心。User 自己添加的 reaction 不代表 Agent 已确认。重复或较旧的 ack 不产生新回执，已保存但尚未完成的回执继续重试。
 
 ```text
 # hopeful_morse 从 m41 确认到 m44；m42、m43、m44 均为 User 发言。

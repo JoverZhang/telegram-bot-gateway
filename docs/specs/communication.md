@@ -328,7 +328,7 @@ If work completes but the Agent is interrupted before ack, messages remain pendi
 
 When ack advances the consumption boundary, the Gateway durably saves the progress and pending ❤️ receipts together before returning success. Receipts cover ordinary conversation from other participants in the newly acknowledged range. They exclude the Agent's own messages, history skipped by the subscription's starting boundary, and management records. Once a message has a known Telegram counterpart, the Bot sets ❤️ on it.
 
-One ❤️ means at least one Agent has explicitly acknowledged the message. Other Agents retain independent progress; later acknowledgements keep the same heart without increasing its count. Repeated or older acknowledgements create no new receipts; previously saved, unfinished receipts continue to retry.
+The Bot's ❤️ means at least one Agent has explicitly acknowledged the message. Other Agents retain independent progress; later acknowledgements keep the Bot's same heart. Reactions added by Users do not indicate Agent acknowledgement. Repeated or older acknowledgements create no new receipts; previously saved, unfinished receipts continue to retry.
 
 ```text
 # hopeful_morse acknowledges from m41 through m44; m42, m43, and m44 are User messages.
