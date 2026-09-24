@@ -117,5 +117,6 @@ Language settings are stored per User. They follow the User's Telegram language 
 |---|---|
 | [communication.md](communication.md) | Communication scenarios for the Agent CLI and Telegram Users: subscriptions, sending, reading, ack, wait, Reply/@, leaving temporarily, and resuming. |
 | [operations.md](operations.md) | Registration and identity, Client/Server configuration, User trust, Group/Topic management, menu interactions, Doctor, status, and language settings. |
+| [http.md](http.md) | Shared rules deriving HTTP requests, parameters, responses, and wait from the CLI. |
 
-HTTP API request and response contracts still need to be specified. Internal responsibilities across CLI → Gateway → Telegram, transport implementation, and state storage are deferred to docs/how. History search and Checkpoint design are outside this stage.
+Internal responsibilities across CLI → Gateway → Telegram, transport implementation, and state storage are deferred to docs/how. History search and Checkpoint design are outside this stage.
