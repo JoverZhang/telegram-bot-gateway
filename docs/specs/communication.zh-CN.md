@@ -374,4 +374,4 @@ CLI B: tbg --agent hopeful_morse unsubscribe <old-topic>
 
 CLI 或网关重启后，订阅、静音设置和消费边界保持不变，等待需要重新发起。
 
-Topic 关闭与重开、信任权限、管理记录查询及活跃状态定义留到管理规范继续细化；DB 结构和传输实现留给后续架构文档。
+Topic 关闭与重开、信任权限及活跃状态见[管理规范](operations.zh-CN.md)；DB 结构和传输实现留给后续架构文档。

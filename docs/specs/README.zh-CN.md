@@ -2,11 +2,13 @@
 
 状态：规划中，接口草案，尚未实现。[English](README.md)
 
-Agent 使用 `tbg` CLI，User 使用 Telegram Bot。本文汇总两个入口的能力；通信场景和错误边界见[通信规范](communication.zh-CN.md)，管理状态与交互见[管理规范草案](operations.zh-CN.md)。
+Agent 使用 `tbg` CLI，User 使用 Telegram Bot。本文汇总两个入口的能力；通信场景和错误边界见[通信规范](communication.zh-CN.md)，配置、管理状态与交互见[管理规范](operations.zh-CN.md)。
 
 ## CLI：tbg --help
 
 `tbg` 专供 Agent 使用。Agent 自助注册，可指定名称；仅省略 `--name` 时自动生成。显式名称为空、非法或冲突时报错，不自动改写。注册成功后携带返回的唯一名称操作。Agent 的内部 ID 不作为使用者需要管理的标识。同一名称在不同 CLI 中共享订阅、静音设置和 ack 进度，不同 Agent 的消费进度各自独立。
+
+Client 与 Server 通过 HTTP 通信，默认端口为 `18473`，各使用一份用户级全局 YAML 配置。配置路径和生效方式见管理规范。
 
 ```text
 tbg — Telegram Bot Gateway
@@ -103,7 +105,9 @@ User 在 Topic 中发言、Reply 或 @ Agent。查询与管理统一从 `/manage
 
 子页面提供返回按钮，筛选通过按钮更新列表。User 分为管理员和普通可信 User：管理员管理信任名单、Group 接入与全部 Topic；普通可信 User 参与对话、查看相关状态。
 
-首次使用时，User 通过 `/whoami` 获取自己的 user_id，并将它写入配置文件的管理员名单。管理员随后可以在菜单中直接授予或撤销普通 User 的信任。管理员将 Bot 拉进 Group 后，网关自动登记，Doctor 展示可用能力及缺少的权限。
+首次使用时，User 通过 `/whoami` 获取自己的 user_id，将它写入 Server 配置的管理员名单，并手动重启 Gateway。管理员随后可以在菜单中直接授予或撤销普通 User 的信任。未信任 User 的普通发言直接忽略、不保存；撤销仅影响生效后的新消息和请求，已接收的历史与消费进度保留。
+
+Gateway 管理员将 Bot 拉进 Group 后，网关自动登记。其他 User 邀请 Bot 时，由 Gateway 管理员在该 Group 输入 `/manage` 完成接入。菜单只允许打开者操作，Doctor 展示可用能力及缺少的权限。
 
 语言设置按 User 保存，默认跟随其 Telegram 语言，也可手动选择。语言字段缺失时沿用上次记录，无法选择支持的语言时回退到 English。菜单使用打开者的语言；本地化覆盖菜单、按钮、提示和诊断文字，名称与对话内容保留原文。语言判定参考 [Telegram 的语言支持约定](https://core.telegram.org/bots/features#language-support)。
 
@@ -112,6 +116,6 @@ User 在 Topic 中发言、Reply 或 @ Agent。查询与管理统一从 `/manage
 | 文件 | 职责 |
 |---|---|
 | [communication.zh-CN.md](communication.zh-CN.md) | Agent CLI 与 Telegram User 的通信场景：订阅、发送、读取、ack、wait、Reply/@、暂离与恢复。 |
-| [operations.zh-CN.md](operations.zh-CN.md)（讨论草案） | 注册与身份、Bot 配置、User 信任、Group/Topic 管理、菜单交互、Doctor、状态及语言设置。 |
+| [operations.zh-CN.md](operations.zh-CN.md) | 注册与身份、Client/Server 配置、User 信任、Group/Topic 管理、菜单交互、Doctor、状态及语言设置。 |
 
-本轮先收敛 CLI 操作与 Telegram 交互。CLI → Gateway → Telegram 的职责、传输方式和状态存储留给后续架构文档。历史检索与 Checkpoint 暂不设计。
+HTTP API 的请求与响应契约尚需细化；CLI → Gateway → Telegram 的内部职责、传输实现和状态存储留给后续 docs/how。历史检索与 Checkpoint 暂不设计。
