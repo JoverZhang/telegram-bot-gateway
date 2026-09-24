@@ -1,4 +1,5 @@
 use crate::model::{Delivery, Error, Job, Message, Result, Topic, msg_id, now, timestamp};
+use crate::model::{GroupInfo, Sender, Subscription, TopicInfo};
 use rusqlite::{Connection, OptionalExtension, params};
 use serde_json::{Value, json};
 pub(crate) struct Tx<'a> {
@@ -54,14 +55,12 @@ impl<'a> Tx<'a> {
         }
         Ok(())
     }
-    pub fn agents(&self) -> Result<Vec<Value>> {
+    pub fn agents(&self) -> Result<Vec<(String, i64)>> {
         let mut q = self
             .c
             .prepare("SELECT name,last_seen FROM agents ORDER BY name")?;
-        Ok(q.query_map([], |r| {
-            Ok(json!({"name":r.get::<_,String>(0)?,"last_seen":r.get::<_,i64>(1)?}))
-        })?
-        .collect::<std::result::Result<_, _>>()?)
+        Ok(q.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
+            .collect::<std::result::Result<_, _>>()?)
     }
     pub fn group(&self, chat: i64, name: &str, connected: bool, available: bool) -> Result<()> {
         self.c.execute("INSERT INTO groups VALUES(?,?,?,?) ON CONFLICT(chat) DO UPDATE SET name=excluded.name,connected=MAX(groups.connected,excluded.connected),available=excluded.available",params![chat,name,connected,available])?;
@@ -85,11 +84,19 @@ impl<'a> Tx<'a> {
             .optional()?
             .unwrap_or(false))
     }
-    pub fn groups(&self) -> Result<Vec<Value>> {
+    pub fn groups(&self) -> Result<Vec<GroupInfo>> {
         let mut q = self
             .c
             .prepare("SELECT chat,name,connected,available FROM groups ORDER BY chat")?;
-        Ok(q.query_map([],|r|Ok(json!({"group":r.get::<_,i64>(0)?.to_string(),"name":r.get::<_,String>(1)?,"connected":r.get::<_,bool>(2)?,"available":r.get::<_,bool>(3)?})))?.collect::<std::result::Result<_,_>>()?)
+        Ok(q.query_map([], |r| {
+            Ok(GroupInfo {
+                group: r.get::<_, i64>(0)?.to_string(),
+                name: r.get(1)?,
+                connected: r.get(2)?,
+                available: r.get(3)?,
+            })
+        })?
+        .collect::<std::result::Result<_, _>>()?)
     }
     pub fn topic(&self, id: &str) -> Result<Topic> {
         self.c.query_row("SELECT t.id,t.chat,t.thread,t.name,t.owner,t.closed,g.connected AND g.available FROM topics t JOIN groups g ON g.chat=t.chat WHERE t.id=?",[id],|r|Ok(Topic{id:r.get(0)?,chat:r.get(1)?,thread:r.get(2)?,name:r.get(3)?,owner:r.get(4)?,closed:r.get(5)?,available:r.get(6)?})).optional()?.ok_or_else(||Error::bad("unknown Topic"))
@@ -105,11 +112,24 @@ impl<'a> Tx<'a> {
         self.c.execute("INSERT INTO topics(id,chat,thread,name,owner) VALUES(?,?,?,?,?) ON CONFLICT(chat,thread) DO UPDATE SET name=CASE WHEN excluded.name='' THEN topics.name ELSE excluded.name END,owner=COALESCE(topics.owner,excluded.owner)",params![id,chat,thread,name,owner])?;
         Ok(id)
     }
-    pub fn topics(&self, chat: Option<i64>) -> Result<Vec<Value>> {
+    pub fn topics(&self, chat: Option<i64>) -> Result<Vec<TopicInfo>> {
         let mut q = self.c.prepare(
             "SELECT id,name,chat,closed FROM topics WHERE (? IS NULL OR chat=?) ORDER BY id",
         )?;
-        Ok(q.query_map(params![chat,chat],|r|Ok(json!({"topic":r.get::<_,String>(0)?,"name":r.get::<_,String>(1)?,"group":r.get::<_,i64>(2)?.to_string(),"status":if r.get::<_,bool>(3)?{"closed"}else{"active"}})))?.collect::<std::result::Result<_,_>>()?)
+        Ok(q.query_map(params![chat, chat], |r| {
+            Ok(TopicInfo {
+                topic: r.get(0)?,
+                name: r.get(1)?,
+                group: r.get::<_, i64>(2)?.to_string(),
+                status: if r.get::<_, bool>(3)? {
+                    "closed"
+                } else {
+                    "active"
+                }
+                .into(),
+            })
+        })?
+        .collect::<std::result::Result<_, _>>()?)
     }
     pub fn close(&self, id: &str, closed: bool) -> Result<()> {
         self.c
@@ -137,11 +157,18 @@ impl<'a> Tx<'a> {
             .optional()?
             .ok_or_else(|| Error::bad("Topic is not currently subscribed"))
     }
-    pub fn subs(&self, a: &str) -> Result<Vec<Value>> {
+    pub fn subs(&self, a: &str) -> Result<Vec<Subscription>> {
         let mut q = self.c.prepare(
             "SELECT topic,acked,muted FROM subscriptions WHERE agent=? AND active=1 ORDER BY topic",
         )?;
-        Ok(q.query_map([a],|r|Ok(json!({"topic":r.get::<_,String>(0)?,"last_acked_msg_id":r.get::<_,Option<i64>>(1)?.map(msg_id),"muted":r.get::<_,bool>(2)?})))?.collect::<std::result::Result<_,_>>()?)
+        Ok(q.query_map([a], |r| {
+            Ok(Subscription {
+                topic: r.get(0)?,
+                last_acked_msg_id: r.get::<_, Option<i64>>(1)?.map(msg_id),
+                muted: r.get(2)?,
+            })
+        })?
+        .collect::<std::result::Result<_, _>>()?)
     }
     pub fn subscribers(&self, t: &str) -> Result<Vec<String>> {
         let mut q = self
@@ -227,9 +254,11 @@ impl<'a> Tx<'a> {
                 Ok(Message {
                     msg_id: msg_id(r.get(0)?),
                     sender: if let Some(a) = a {
-                        json!({"type":"agent","name":a})
+                        Sender::Agent { name: a }
                     } else {
-                        json!({"type":"user","user_id":u})
+                        Sender::User {
+                            user_id: u.unwrap_or(0),
+                        }
                     },
                     content: r.get(3)?,
                     sent_at: timestamp(r.get(4)?),
@@ -326,12 +355,17 @@ impl<'a> Tx<'a> {
         )?;
         Ok(())
     }
-    pub fn defer(&self, job: i64, reason: &str, next: i64) -> Result<()> {
+    pub fn defer(&self, job: i64, reason: &str, next: i64) -> Result<bool> {
+        let changed: bool = self.c.query_row(
+            "SELECT error IS NULL OR error<>? FROM outbox WHERE id=?",
+            params![reason, job],
+            |row| row.get(0),
+        )?;
         self.c.execute(
             "UPDATE outbox SET status='blocked',error=?,next_attempt=? WHERE id=?",
             params![reason, next, job],
         )?;
-        Ok(())
+        Ok(changed)
     }
     pub fn completed(&self, job: &Job) -> Result<()> {
         self.c.execute(

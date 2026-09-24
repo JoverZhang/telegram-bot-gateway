@@ -1,6 +1,6 @@
 # CLI 到 HTTP 的映射
 
-状态：规划中，映射规范，尚未实现。[English](http.md)
+状态：部分实现，当前范围见[项目 README](../../README.zh-CN.md)。[English](http.md)
 
 HTTP 接口由[操作能力总览](README.zh-CN.md)中的 CLI 命令推导。命令含义、校验和返回字段沿用[通信规范](communication.zh-CN.md)与[管理规范](operations.zh-CN.md)，本文只定义通用映射。
 

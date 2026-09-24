@@ -28,17 +28,13 @@ impl Gateway {
                                     None
                                 };
                                 if let Some(reason) = reason {
-                                    tx.defer(job.id, reason, now() + 1_000)?;
+                                    defer(tx, &job, reason)?;
                                     continue;
                                 }
                                 if let Some(quote) = quote {
                                     *target = tx.platform_message(quote, job.chat)?;
                                     if target.is_none() {
-                                        tx.defer(
-                                            job.id,
-                                            "waiting for quoted message delivery",
-                                            now() + 1_000,
-                                        )?;
+                                        defer(tx, &job, "waiting for quoted message delivery")?;
                                         continue;
                                     }
                                 }
@@ -46,11 +42,7 @@ impl Gateway {
                             Delivery::Heart { target } => {
                                 *target = tx.platform_message(message, job.chat)?;
                                 if target.is_none() {
-                                    tx.defer(
-                                        job.id,
-                                        "waiting for message delivery before receipt",
-                                        now() + 1_000,
-                                    )?;
+                                    defer(tx, &job, "waiting for message delivery before receipt")?;
                                     continue;
                                 }
                             }
@@ -93,4 +85,14 @@ impl Gateway {
             })
             .await
     }
+}
+
+fn defer(tx: &crate::db::Tx<'_>, job: &Job, reason: &str) -> Result<()> {
+    if tx.defer(job.id, reason, now() + 1_000)? {
+        eprintln!(
+            "delivery {} (message {:?}) blocked: {reason}",
+            job.id, job.message
+        );
+    }
+    Ok(())
 }

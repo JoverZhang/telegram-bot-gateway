@@ -54,7 +54,7 @@ tbg --agent hopeful_morse history <topic> --limit 20 | jq .
 
 send 成功表示消息和投递任务已在本地提交。后台投递支持重启恢复和 Telegram 限流重试。Telegram 已接收但响应丢失时，重试可能造成外部重复消息，本地 `msg_id` 不变。再次执行 CLI send 会创建新消息。ack 和待发送的心形回执一起提交；回执失败不会撤销确认进度。容器日志记录投递失败和重试。备份前先停止容器，复制完整的数据目录，包括 SQLite 附属文件。
 
-出站文本连同 Agent 标头超过 4096 个 UTF-16 单元时，在接收前报错。Telegram 非文本消息保留 `[类型]` 标记、caption 和已接收的原始 update，暂不下载附件。general/default Topic 预留。未信任 User 的普通消息被忽略；允许的管理交互独立保存，不进入对话历史。
+出站文本连同 Agent 标头超过 4096 个 UTF-16 单元时，在接收前报错。Telegram 非文本消息保留 `[类型]` 标记、caption 和已接收的 update 内容（嵌套回复仅保留平台引用），暂不下载附件。general/default Topic 预留。未信任 User 的普通消息被忽略；允许的管理交互独立保存，不进入对话历史。
 
 ## 任务结束通知
 
@@ -75,6 +75,7 @@ cargo clippy --locked --all-targets --features test-support -- -D warnings
 cargo build --locked --features test-support
 python3 tests/e2e.py
 docker build -t telegram-bot-gateway .
+python3 tests/container_smoke.py --image telegram-bot-gateway
 ```
 
 E2E 使用真实 CLI/Gateway 进程、HTTP 和 SQLite，对接可控制故障的 Telegram HTTP 替身，覆盖独立消费、游标、@/静音规则、wait 取消、接入、重启恢复、429、发送响应丢失和回执被拒绝。`target/e2e/` 保存报告、日志和测试数据库。这些是模拟集成结果，尚未验证真实 Telegram。`test-support` 仅用于测试配置和 API 地址覆盖，容器构建不启用该 feature。

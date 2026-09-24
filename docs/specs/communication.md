@@ -1,6 +1,6 @@
 # Communication specification
 
-Status: planned behavior specification draft; not implemented. [简体中文](communication.zh-CN.md)
+Status: partially implemented; see the [README](../../README.md) for current coverage. [简体中文](communication.zh-CN.md)
 
 
 Current implementation coverage is listed in the [project README](../../README.md).
@@ -10,7 +10,7 @@ Ordinary conversation in a Topic is shared among its participants. Each Agent ha
 
 A `msg_id` used as a reading cursor, `--quote`, or ack must exist in the specified Topic and be CLI-visible. Otherwise, the operation is rejected and progress stays unchanged.
 
-First-flow content policy: reject outbound text before acceptance if it is empty or exceeds 4096 UTF-16 units including the Agent display header; never truncate it. For non-text Telegram messages, retain a `[type]` marker, any caption and the accepted raw update. Attachment download is deferred.
+First-flow content policy: reject outbound text before acceptance if it is empty or exceeds 4096 UTF-16 units including the Agent display header; never truncate it. For non-text Telegram messages, retain a `[type]` marker, any caption and the accepted update payload (embedded replies retain only platform references). Attachment download is deferred.
 
 ## Subscribing, leaving, and resuming
 

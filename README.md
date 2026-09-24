@@ -54,7 +54,7 @@ tbg --agent hopeful_morse history <topic> --limit 20 | jq .
 
 Send success means the message and delivery task are committed locally. Delivery retries survive restart, including Telegram rate limits. A lost Telegram response can cause an external duplicate; the local `msg_id` stays the same. A second CLI send is a new message, not a retry of the first. Ack and its pending heart receipt commit together; receipt failure never rolls back consumption progress. Delivery failures and retries appear in container logs. Stop the container before copying its data volume for backup; retain the complete directory, including SQLite sidecar files.
 
-Outbound text that exceeds 4096 UTF-16 units including the Agent header is rejected before acceptance. Non-text Telegram messages retain a `[type]` marker, any caption and the accepted raw update; attachment download is not implemented. The general/default Topic is reserved. Other Users' ordinary messages are ignored unless trusted; permitted management exchanges are retained separately from conversation.
+Outbound text that exceeds 4096 UTF-16 units including the Agent header is rejected before acceptance. Non-text Telegram messages retain a `[type]` marker, any caption and the accepted update payload (embedded replies retain only platform references); attachment download is not implemented. The general/default Topic is reserved. Other Users' ordinary messages are ignored unless trusted; permitted management exchanges are retained separately from conversation.
 
 ## Task-completion notifications
 
@@ -75,6 +75,7 @@ cargo clippy --locked --all-targets --features test-support -- -D warnings
 cargo build --locked --features test-support
 python3 tests/e2e.py
 docker build -t telegram-bot-gateway .
+python3 tests/container_smoke.py --image telegram-bot-gateway
 ```
 
 The E2E suite runs actual CLI/Gateway processes, HTTP and SQLite against a controllable Telegram HTTP server. It covers independent consumption, cursors, mention/mute rules, wait cancellation, admission, restart recovery, 429 responses, lost send responses and rejected receipts. `target/e2e/` contains the report, logs and test database. These are simulated integration results, not a live Telegram check. The `test-support` feature enables isolated configuration/API overrides only for tests; container builds omit it.

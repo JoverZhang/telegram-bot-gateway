@@ -23,8 +23,8 @@ impl Gateway {
                 Event::Message(message) => {
                     let admin = admins.contains(&message.user);
                     let trusted = admin || tx.trusted(message.user)?;
-                    if message.content.starts_with('/') {
-                        let command = bot::command(&message.content);
+                    let command = bot::command(&message.content);
+                    if matches!(command, "/help" | "/whoami" | "/manage") {
                         if command == "/manage" && admin && message.group {
                             tx.group(message.chat, &message.title, true, true)?;
                         }

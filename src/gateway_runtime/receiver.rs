@@ -41,7 +41,8 @@ pub(super) async fn run(
                 tokio::select! {_=stop.cancelled()=>return Ok(()),v=g.telegram.updates(offset)=>v};
             match batch {
                 Ok(updates) => {
-                    if !updates.is_empty() {
+                    let received = !updates.is_empty();
+                    if received {
                         last_update = std::time::Instant::now();
                     }
                     for update in updates {
@@ -50,12 +51,14 @@ pub(super) async fn run(
                         }
                         g.ingest(update).await.map_err(|e| e.to_string())?;
                     }
-                    offset =
-                        g.db.run(false, |tx| {
-                            Ok(tx.meta("offset")?.and_then(|s| s.parse::<i64>().ok()))
-                        })
-                        .await
-                        .map_err(|e| e.to_string())?;
+                    if received {
+                        offset =
+                            g.db.run(false, |tx| {
+                                Ok(tx.meta("offset")?.and_then(|s| s.parse::<i64>().ok()))
+                            })
+                            .await
+                            .map_err(|e| e.to_string())?;
+                    }
                 }
                 Err(e) => {
                     eprintln!("Telegram polling unavailable: {}", e.detail);

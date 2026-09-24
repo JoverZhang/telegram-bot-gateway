@@ -35,7 +35,7 @@ pub(crate) enum TopicEvent {
     Reopened,
 }
 impl Update {
-    fn decode(value: Value) -> Result<Self, Failure> {
+    fn decode(mut value: Value) -> Result<Self, Failure> {
         let id = value["update_id"]
             .as_i64()
             .ok_or_else(|| Failure::invalid("missing update_id"))?;
@@ -58,8 +58,9 @@ impl Update {
             ]
             .iter()
             .any(|key| message.get(*key).is_some());
-            if !service
-                && (message.get("sender_chat").is_some() || message["from"]["is_bot"] == true)
+            if message.get("pinned_message").is_some()
+                || (!service
+                    && (message.get("sender_chat").is_some() || message["from"]["is_bot"] == true))
             {
                 Event::Other
             } else if let Some(user) =
@@ -126,6 +127,17 @@ impl Update {
         } else {
             Event::Other
         };
+        // A trusted reply may embed an ignored User's entire message. Keep references,
+        // not a second copy that bypasses admission/trust checks on the original.
+        if let Some(message) = value.get_mut("message").and_then(Value::as_object_mut) {
+            for key in ["reply_to_message", "external_reply"] {
+                if let Some(reference) = message.get_mut(key) {
+                    let id = reference["message_id"].clone();
+                    let chat = reference["chat"]["id"].clone();
+                    *reference = json!({"message_id":id,"chat":{"id":chat}});
+                }
+            }
+        }
         Ok(Self {
             id,
             raw: value.to_string(),

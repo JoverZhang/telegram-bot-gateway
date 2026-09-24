@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 #[derive(Debug, Clone)]
 pub enum ErrorKind {
@@ -57,11 +56,11 @@ pub fn parse_msg(s: &str) -> Result<i64> {
         .filter(|n| *n > 0)
         .ok_or_else(|| Error::bad("invalid msg_id"))
 }
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Message {
     pub msg_id: String,
     pub sent_at: String,
-    pub sender: Value,
+    pub sender: Sender,
     pub content: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub quote_msg_id: Option<String>,
@@ -96,4 +95,32 @@ pub enum Delivery {
     Heart {
         target: Option<i64>,
     },
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GroupInfo {
+    pub group: String,
+    pub name: String,
+    pub connected: bool,
+    pub available: bool,
+}
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TopicInfo {
+    pub topic: String,
+    pub name: String,
+    pub group: String,
+    pub status: String,
+}
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Subscription {
+    pub topic: String,
+    pub last_acked_msg_id: Option<String>,
+    pub muted: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum Sender {
+    Agent { name: String },
+    User { user_id: i64 },
 }

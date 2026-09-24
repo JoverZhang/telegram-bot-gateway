@@ -1,6 +1,6 @@
 # CLI-to-HTTP mapping
 
-Status: planned mapping specification; not implemented. [简体中文](http.zh-CN.md)
+Status: partially implemented; see the [README](../../README.md) for current coverage. [简体中文](http.zh-CN.md)
 
 HTTP endpoints are derived from the CLI commands in the [interface overview](README.md). Command behavior, validation, and response fields follow the [communication](communication.md) and [operations](operations.md) specifications. This document defines only the shared mapping rules.
 

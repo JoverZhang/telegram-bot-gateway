@@ -29,7 +29,10 @@ async fn handle(
     body: std::result::Result<Json<Value>, JsonRejection>,
 ) -> Response {
     let result = match (uri.path().strip_prefix("/v1/"), body) {
-        (Some(route), Ok(Json(b))) => g.execute(route.into(), b, cancel).await,
+        (Some(route), Ok(Json(body))) => match crate::contract::Request::decode(route, body) {
+            Ok(request) => g.execute(request, cancel).await,
+            Err(error) => Err(Error::bad(error)),
+        },
         (None, _) => Err(Error {
             kind: ErrorKind::NotFound,
             message: "unknown path".into(),

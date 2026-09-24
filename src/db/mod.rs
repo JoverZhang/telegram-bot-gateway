@@ -59,6 +59,7 @@ impl Database {
         let change = self.changes.clone();
         self.sender
             .send(Box::new(move |c| {
+                let before = c.total_changes();
                 let result = (|| {
                     let t = c.transaction_with_behavior(if write {
                         rusqlite::TransactionBehavior::Immediate
@@ -69,7 +70,7 @@ impl Database {
                     t.commit()?;
                     Ok(v)
                 })();
-                if write && result.is_ok() {
+                if write && result.is_ok() && c.total_changes() != before {
                     change.send_modify(|v| *v = v.wrapping_add(1));
                 }
                 let _ = sender.send(result);

@@ -9,11 +9,13 @@ struct Args {
 }
 pub async fn run() -> std::result::Result<(), String> {
     let a = Args::parse();
-    let (route, body) = a.command.wire(a.agent.as_deref());
-    crate::contract::validate(route, &body)?;
+    let request = crate::contract::Request::new(a.agent, a.command)?;
     let c = crate::config::ClientConfig::load()?;
     let client = crate::client::GatewayClient::new(c.endpoint())?;
-    let v = client.execute(route, body).await?;
+    let v = client
+        .execute(&request)
+        .await
+        .map_err(|error| error.to_string())?;
     println!("{}", serde_json::to_string(&v).map_err(|e| e.to_string())?);
     Ok(())
 }

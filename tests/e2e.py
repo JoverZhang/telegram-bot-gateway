@@ -32,9 +32,10 @@ class Telegram(http.server.BaseHTTPRequestHandler):
             if method == "getMe":
                 result = {"id": 999, "is_bot": True, "username": "gateway_test_bot"}
             elif method == "getUpdates":
-                result = [
+                Telegram.updates = [
                     u for u in self.updates if u["update_id"] >= body.get("offset", 0)
                 ]
+                result = list(Telegram.updates)
             elif method == "getWebhookInfo":
                 result = {"url": ""}
             elif method == "getChat":
@@ -49,6 +50,9 @@ class Telegram(http.server.BaseHTTPRequestHandler):
             elif method == "createForumTopic":
                 Telegram.tid += 1
                 result = {"message_thread_id": self.tid, "name": body["name"]}
+                if getattr(Telegram, "lose_create_response", False):
+                    self.close_connection = True
+                    return
             elif method == "sendMessage":
                 mode = self.faults.popleft() if self.faults else None
                 if mode == "retry":
@@ -276,8 +280,9 @@ def main():
             results.append(
                 "independent progress, complete context, pagination, mention wake, Bot receipts"
             )
-            # The same update may be replayed across receiver restarts.
+            # Explicitly redeliver an already committed update across a restart.
             stop()
+            update(3, 3, "Correction: only test @beta", thread)
             start()
             assert len(api("history", agent="alpha", topic=topic)["messages"]) == 2
             # A long wait holds one Agent slot; aborting the TCP client releases it.
@@ -427,11 +432,22 @@ def main():
                             "chat": {"id": -100, "type": "supergroup"},
                             "message_thread_id": thread,
                             "text": "reply without mention",
-                            "reply_to_message": {"message_id": 3},
+                            "reply_to_message": {
+                                "message_id": 6,
+                                "from": {"id": 456},
+                                "text": "UNTRUSTED_SECRET",
+                            },
                         },
                     }
                 )
             eventually(lambda: received(7))
+            with sqlite3.connect(data / "gateway.sqlite") as database:
+                raw = database.execute("SELECT raw FROM updates WHERE id=7").fetchone()[
+                    0
+                ]
+                assert "UNTRUSTED_SECRET" not in raw
+                assert json.loads(raw)["message"]["reply_to_message"]["message_id"] == 6
+
             assert api("wait", agent="beta", topic=topic, timeout=1) == {"topics": []}
             waiter = subprocess.Popen(
                 [
@@ -531,6 +547,124 @@ def main():
                 "initialization, instance lock, trust isolation, reply-only mute, live wait changes, media retention, hook"
             )
 
+            # A blocked send stalls its Topic, not another Topic; quotes wait for mapping.
+            eventually(
+                lambda: any(
+                    item.get("text", "").endswith("hook complete")
+                    for item in Telegram.sends
+                )
+            )
+            with Telegram.lock:
+                Telegram.faults.append("blocked")
+            blocked = cli("--agent", "alpha", "send", topic, "blocked first")["msg_id"]
+
+            def blocked_saved():
+                with sqlite3.connect(data / "gateway.sqlite") as database:
+                    return (
+                        database.execute(
+                            "SELECT status FROM outbox WHERE kind='send' AND message=?",
+                            (int(blocked[1:]),),
+                        ).fetchone()[0]
+                        == "blocked"
+                    )
+
+            eventually(blocked_saved)
+            cli("--agent", "alpha", "send", topic, "queued quote", "--quote", blocked)
+            other = cli(
+                "--agent",
+                "alpha",
+                "topic",
+                "create",
+                "--group",
+                "-100",
+                "--name",
+                "Independent",
+            )["topic"]
+            cli("--agent", "alpha", "send", other, "independent Topic")
+            eventually(
+                lambda: any(
+                    item.get("text", "").endswith("independent Topic")
+                    for item in Telegram.sends
+                )
+            )
+            assert not any(
+                item.get("text", "").endswith("queued quote") for item in Telegram.sends
+            )
+            stop()
+            start()
+            quoted = eventually(
+                lambda: next(
+                    (
+                        item
+                        for item in Telegram.sends
+                        if item.get("text", "").endswith("queued quote")
+                    ),
+                    None,
+                )
+            )
+            assert quoted["reply_parameters"]["message_id"] > 0
+            results.append(
+                "per-Topic send ordering, cross-Topic progress, durable quote mapping"
+            )
+            Telegram.lose_create_response = True
+            cli(
+                "--agent",
+                "alpha",
+                "topic",
+                "create",
+                "--group",
+                "-100",
+                "--name",
+                "Lost create",
+                ok=False,
+            )
+            Telegram.lose_create_response = False
+            with sqlite3.connect(data / "gateway.sqlite") as database:
+                result = database.execute(
+                    "SELECT detail FROM management WHERE kind='topic/create result' ORDER BY id DESC LIMIT 1"
+                ).fetchone()[0]
+                assert json.loads(result)["outcome_unknown"] is True
+            # After a long offline interval Telegram may choose a lower random update ID.
+            stop()
+            with sqlite3.connect(data / "gateway.sqlite") as database:
+                database.execute("UPDATE meta SET value='10001' WHERE key='offset'")
+            with Telegram.lock:
+                Telegram.updates.clear()
+                call_start = len(Telegram.calls)
+            start()
+            eventually(
+                lambda: (
+                    len(
+                        [
+                            body
+                            for method, body in Telegram.calls[call_start:]
+                            if method == "getUpdates"
+                        ]
+                    )
+                    >= 3
+                )
+            )
+            assert all(
+                body.get("offset") is None
+                for method, body in Telegram.calls[call_start:]
+                if method == "getUpdates"
+            )
+            update(50, 50, "/home/mira/project is the workspace", thread)
+            eventually(lambda: received(50))
+            assert (
+                api("history", agent="alpha", topic=topic)["messages"][0]["content"]
+                == "/home/mira/project is the workspace"
+            )
+            assert (
+                sum(
+                    method == "createForumTopic" and body.get("name") == "Lost create"
+                    for method, body in Telegram.calls
+                )
+                == 1
+            )
+            results.append(
+                "empty startup polls preserve reset offset; slash-prefixed conversation is retained"
+            )
         finally:
             stop()
             stub.shutdown()

@@ -3,12 +3,13 @@ mod delivery;
 mod ingest;
 mod management;
 mod wait;
+use crate::contract::{Agent, Command, Request, Response};
 use crate::{
     db::Database,
     model::{Error, Result},
     telegram::TelegramClient,
 };
-use serde_json::{Value, json};
+use serde_json::json;
 use std::{
     collections::HashSet,
     sync::{Arc, Mutex},
@@ -31,13 +32,11 @@ impl Gateway {
     }
     pub async fn execute(
         &self,
-        route: String,
-        b: Value,
+        request: Request,
         cancel: tokio_util::sync::CancellationToken,
-    ) -> Result<Value> {
-        crate::contract::validate(&route, &b).map_err(Error::bad)?;
-        if route == "agent/register" {
-            let name = b["name"].as_str().map(str::to_owned).unwrap_or_else(|| {
+    ) -> Result<Response> {
+        if let Command::Agent(Agent::Register { name }) = request.command {
+            let name = name.unwrap_or_else(|| {
                 format!("agent_{}", &uuid::Uuid::new_v4().simple().to_string()[..12])
             });
             if !valid_name(&name) {
@@ -48,20 +47,22 @@ impl Gateway {
                 .run(true, move |tx| {
                     tx.register(&name)?;
                     tx.audit("register", json!({"agent":name}))?;
-                    Ok(json!({"name":name}))
+                    Ok(Response::Identity { name })
                 })
                 .await;
         }
-        let agent = b["agent"].as_str().unwrap().to_owned();
+        let agent = request
+            .agent
+            .ok_or_else(|| Error::bad("agent is required"))?;
         let a = agent.clone();
         self.db.run(false, move |tx| tx.require_agent(&a)).await?;
         let actor = agent.clone();
-        let result = if route == "wait" {
-            self.wait(agent, b, cancel).await
-        } else if route.starts_with("topic/") || route == "agent/list" || route == "group/list" {
-            self.manage(&route, agent, b).await
-        } else {
-            self.communication(route, agent, b).await
+        let result = match request.command {
+            Command::Wait { topic, timeout } => self.wait(agent, topic, timeout, cancel).await,
+            command @ (Command::Topic(_) | Command::Agent(_) | Command::Group(_)) => {
+                self.manage(command, agent).await
+            }
+            command => self.communication(command, agent).await,
         };
         if result.is_ok() {
             self.db.run(true, move |tx| tx.seen(&actor)).await?;

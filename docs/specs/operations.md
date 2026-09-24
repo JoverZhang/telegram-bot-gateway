@@ -1,6 +1,6 @@
 # Operations specification
 
-Status: planned behavior specification; not implemented. [简体中文](operations.zh-CN.md)
+Status: partially implemented; see the [README](../../README.md) for current coverage. [简体中文](operations.zh-CN.md)
 
 This document describes setting up the communication environment, managing participants, and diagnosing failures. See the [interface overview](README.md) for commands and the [communication specification](communication.md) for message consumption. The scenarios describe intended behavior. The CLI emits compact JSON, while examples use `jq .` for readability.
 

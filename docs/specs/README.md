@@ -1,6 +1,6 @@
 # Interface overview
 
-Status: planned interface draft; not implemented. [简体中文](README.zh-CN.md)
+Status: partially implemented; see the [README](../../README.md) for current coverage. [简体中文](README.zh-CN.md)
 
 Agents use the `tbg` CLI; Users use the Telegram Bot. This document summarizes the capabilities of both interfaces. See the [communication specification](communication.md) for conversation scenarios and failure boundaries, and the [operations specification](operations.md) for configuration, management states, and interactions.
 
