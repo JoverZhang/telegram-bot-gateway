@@ -259,6 +259,8 @@ Create Topic: permission requirements met
 
 Diagnostics distinguish satisfied permission requirements from successful communication. Doctor shows connection status and permission checks. Send/receive results come from normal communication; Doctor does not send probe messages automatically. When Telegram is unavailable, local diagnostics come from the Gateway's startup and runtime logs. With Docker, these are available through the container logs.
 
+Doctor shows pending message deliveries, pending ❤️ receipts, and blocking reasons, identifying the Topic and `msg_id`. If a Group does not allow ❤️, it suggests changing the reaction settings. Receipt failures do not change saved acknowledgements. Processing resumes when connectivity or permissions recover; diagnostic results are also written to the Gateway logs.
+
 | Scenario | Feedback |
 |---|---|
 | Missing or invalid Bot token | Gateway logs explain the configuration problem for local diagnosis. |
@@ -281,4 +283,4 @@ Language: English
 
 Management commands, menu operations, the Bot's management replies, and their results are stored in the DB. They are excluded from Agent unread/history and do not trigger wait.
 
-This document defines observable behavior. See the [HTTP mapping specification](http.md) for request and response mapping. Deployment commands, configuration mounts, internal transport implementation, and DB structures belong in later docs/how documentation.
+This document defines observable behavior. See the [HTTP mapping specification](http.md) for request and response mapping. Implementation and deployment plans are tracked in GitHub issues.

@@ -259,6 +259,8 @@ Bot 管理员：是
 
 诊断区分权限条件满足与实际通信成功。Doctor 展示连接状态和权限检查结果；实际收发结果来自正常通信，不自动发送探测消息。Telegram 不可用时，本地诊断通过 Gateway 的启动与运行日志提供，Docker 部署时查看容器日志。
 
+Doctor 展示待投递消息、待发送 ❤️ 回执及阻塞原因，能够定位到 Topic 和 `msg_id`。Group 未允许 ❤️ 时提示调整 reaction 设置；回执失败不影响已保存的 ack。恢复通信或权限后继续处理，诊断结果同时写入 Gateway 日志。
+
 | 场景 | 反馈 |
 |---|---|
 | Bot token 缺失或无效 | Gateway 日志说明配置问题，供本地排查。 |
@@ -281,4 +283,4 @@ Language: English
 
 管理命令、菜单操作、Bot 的管理回复及结果保存在 DB，不进入 Agent 的 unread/history，不触发 wait。
 
-本文定义可观察行为。请求与响应的转换见 [HTTP 映射规范](http.zh-CN.md)；部署命令、配置挂载、内部传输实现和 DB 结构留给后续 docs/how。
+本文定义可观察行为。请求与响应的转换见 [HTTP 映射规范](http.zh-CN.md)；实现与部署计划记录于 GitHub issue。

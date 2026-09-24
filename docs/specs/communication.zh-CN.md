@@ -255,6 +255,34 @@ Telegram Topic：
 
 Reply 和 @ 都不建立私信或独占分配，其他 Agent 仍可读取同一对话。
 
+## 至少一次投递
+
+Gateway 对已持久接收的对话承担至少一次投递责任：中断后继续投递，允许重复。保证依赖持久存储保留、Gateway 恢复运行，以及 Telegram 重新具备投递条件。
+
+| 环节 | 接收与恢复规则 |
+|---|---|
+| Agent → Gateway | `send` 校验通过后，消息和待投递记录一起持久保存，随后返回 `msg_id`。成功表示已接收；Telegram 中出现消息可能稍晚。未能持久保存时不返回成功。 |
+| Gateway → Telegram | 已接收的消息立即进入 Topic 历史；待投递记录持续保留，直到确认 Telegram 发送成功。网络故障、限流、结果不明或重启后自动重试，重试沿用原 `msg_id`。 |
+| Telegram → Gateway | 符合接入与信任规则的对话先保存，再确认收到对应 update。同一 update 重复到达时复用已有记录和 `msg_id`。 |
+| Gateway → Agent | 未 ack 的消息持续可读；读取、中断或重启都不确认消费。重复处理由 Agent 按 `msg_id` 识别，显式 ack 后保存进度。 |
+
+已知 Topic 关闭或 Group 不可用时，新的 send 按管理规范拒绝。已接收消息后来因权限或 Topic 状态而无法投递时，保留待投递记录和失败原因，通过 Doctor 与日志反馈，条件恢复后继续。重试采用退避，限流时遵循 Telegram 的 `retry_after`。
+
+Telegram 已发送但响应丢失时，Gateway 重试可能产生重复的 Telegram 消息；本地仍是一条消息。CLI 不自动重发请求；响应丢失后，调用方再次执行 send 是一次新的发送，也可能产生重复。至少一次投递不保证恰好一次执行。
+
+```text
+# Group 和 Topic 已接入；Gateway 暂时无法连接 Telegram。
+$ tbg --agent hopeful_morse send <topic> "任务完成" | jq .
+{
+  "msg_id": "m60"
+}
+# m60 与待投递记录已保存，history 可以读到它。
+# 此时 Gateway 重启：恢复待投递记录；网络恢复后继续发送 m60。
+# Telegram 显示消息；Gateway 保存发送结果后结束这条记录的投递重试。
+```
+
+Telegram 的待接收 update [最多保留 24 小时](https://core.telegram.org/bots/api#getting-updates)。超出上游保留期且尚未被 Gateway 接收的消息不在上述保证内。发送与限流行为参考 [sendMessage](https://core.telegram.org/bots/api#sendmessage) 和 [ResponseParameters](https://core.telegram.org/bots/api#responseparameters)。
+
 ## 确认进度与继续处理
 
 `ack --through <msg_id>` 累计确认到指定消息，包含该消息。Agent 负责判断此前待确认消息是否已实际读取并处理；只有显式 ack 推进消费边界，读取、发送、引用回复、静音和 wait 均不代为确认。`next_cursor` 不代表已处理进度，ack 也不代表 Telegram 客户端的已读回执。
@@ -295,6 +323,25 @@ CLI B: tbg --agent hopeful_morse ack <topic> --through m45 | jq .
 ```
 
 处理完成但 ack 之前中断时，消息仍待确认，恢复后可能重新处理；Agent 需考虑工作本身的重复执行。
+
+### Telegram 中的确认回执
+
+ack 推进消费边界时，Gateway 同时持久保存进度和待发送的 ❤️ 回执，随后返回成功。回执覆盖本次新确认范围内、来自其他参与者的普通对话；自身发言、订阅起点之前跳过的历史和管理记录不添加回执。消息有已知的 Telegram 对应消息后，由 Bot 设置 ❤️。
+
+Bot 的 ❤️ 表示至少一个 Agent 已显式 ack。其他 Agent 的进度仍独立；后续 ack 继续保持 Bot 的同一颗心。User 自己添加的 reaction 不代表 Agent 已确认。重复或较旧的 ack 不产生新回执，已保存但尚未完成的回执继续重试。
+
+```text
+# hopeful_morse 从 m41 确认到 m44；m42、m43、m44 均为 User 发言。
+$ tbg --agent hopeful_morse ack <topic> --through m44 | jq .
+{
+  "last_acked_msg_id": "m44"
+}
+# Telegram：m42 ❤️、m43 ❤️、m44 ❤️。
+# calm_turing 尚未 ack：仍可按自己的进度读取这些消息。
+# 若 reaction 发送前 Gateway 重启：已确认进度保持 m44，恢复后补发 ❤️。
+```
+
+reaction 的网络失败和限流会重试；Group 禁用 ❤️、权限不足或消息已删除时，保存失败原因并通过 Doctor 与日志反馈，条件允许时继续。回执失败不撤销 ack。reaction 及其重试结果作为管理记录保存，不进入 unread/history，也不唤起 Agent。Bot 使用 Telegram 的 [setMessageReaction](https://core.telegram.org/bots/api#setmessagereaction) 设置回执。
 
 ## 等待、静音与唤起
 
@@ -374,4 +421,4 @@ CLI B: tbg --agent hopeful_morse unsubscribe <old-topic>
 
 CLI 或网关重启后，订阅、静音设置和消费边界保持不变，等待需要重新发起。
 
-Topic 关闭与重开、信任权限及活跃状态见[管理规范](operations.zh-CN.md)；DB 结构和传输实现留给后续架构文档。
+Topic 关闭与重开、信任权限及活跃状态见[管理规范](operations.zh-CN.md)。实现计划通过 GitHub issue 记录。

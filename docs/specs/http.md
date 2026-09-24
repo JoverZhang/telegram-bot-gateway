@@ -49,7 +49,7 @@ Invalid parameters or rejected operations use `4xx`; server or dependency failur
 }
 ```
 
-The CLI writes the error explanation to stderr and exits with a nonzero status. Without a complete HTTP response, it reports a connection or read failure. The CLI does not retry automatically; a missing response does not establish that the command was never executed.
+The CLI writes the error explanation to stderr and exits with a nonzero status. Without a complete HTTP response, it reports a connection or read failure. The CLI does not retry automatically; a missing response does not establish that the command was never executed. Gateway delivery retries for durably accepted messages follow the [communication specification](communication.md).
 
 ## wait
 
@@ -57,4 +57,4 @@ A wait keeps one HTTP request open until an ending condition from the communicat
 
 If the client cancels the request or the connection is interrupted, the Gateway ends that wait when it detects the disconnected request, freeing the Agent's wait slot without acknowledging messages. Other commands retain their own execution rules.
 
-The `agent` field selects a participant identity; it is not an access credential. HTTP access authentication remains a separate decision.
+HTTP requests require no authentication or access token. Any caller that can reach the Gateway can register an Agent and select a registered identity through `agent`. Telegram User trust still follows the operations specification.

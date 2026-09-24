@@ -67,6 +67,8 @@ Topic 是共享对话空间。Reply 保留回应关系，@ 表达希望谁关注
 
 unread 和 history 默认最多返回 20 条，`--cursor` 排除指定消息，沿命令的读取方向继续。每条消息包含 `msg_id`、发送时间、发送者及完整正文。Agent 应先读完后续对话再回应，并显式 ack 已处理的消息；读取和发送都不自动确认。消息字段、分页返回、订阅恢复及 wait 场景见[通信规范](communication.zh-CN.md)。
 
+已持久接收的消息按至少一次投递；`send` 成功表示 Gateway 已保存消息并负责投递。Agent 显式 ack 后，Bot 为相应 Telegram 消息添加 ❤️，表示至少一个 Agent 已确认。投递重试及回执失败的行为见通信规范。
+
 ## Telegram Bot：/help
 
 User 在 Topic 中发言、Reply 或 @ Agent。查询与管理统一从 `/manage` 进入，通过按钮操作；菜单根据当前位置和 User 权限展示可用能力。
@@ -119,4 +121,4 @@ Gateway 管理员将 Bot 拉进 Group 后，网关自动登记。其他 User 邀
 | [operations.zh-CN.md](operations.zh-CN.md) | 注册与身份、Client/Server 配置、User 信任、Group/Topic 管理、菜单交互、Doctor、状态及语言设置。 |
 | [http.zh-CN.md](http.zh-CN.md) | 从 CLI 推导 HTTP 请求、参数、响应和 wait 的通用映射。 |
 
-CLI → Gateway → Telegram 的内部职责、传输实现和状态存储留给后续 docs/how。历史检索与 Checkpoint 暂不设计。
+实现方案与临时计划通过 [GitHub issue](https://github.com/JoverZhang/telegram-bot-gateway/issues) 记录；docs 保留愿景和行为规范。历史检索与 Checkpoint 暂不设计。
