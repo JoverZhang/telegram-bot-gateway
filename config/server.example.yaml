@@ -1,0 +1,7 @@
+# Choose an explicit address and port. There is no default port.
+listen: "127.0.0.1:18473"
+telegram:
+  bot_token: "<bot_token>"
+admins: []
+# Matches the Docker volume. Native runs may omit this to use ~/.local/share/tbg.
+data_dir: "/var/lib/tbg"

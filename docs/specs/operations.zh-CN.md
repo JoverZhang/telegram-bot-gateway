@@ -1,8 +1,10 @@
 # 管理规范
 
-状态：规划中，行为规范，尚未实现。[English](operations.md)
+状态：部分实现，当前范围见[项目 README](../../README.zh-CN.md)。[English](operations.md)
 
 本文描述如何建立通信环境、管理参与者，以及发现通信异常。命令入口见[操作能力总览](README.zh-CN.md)，消息消费规则见[通信规范](communication.zh-CN.md)。以下场景均为预期行为；CLI 实际输出紧凑 JSON，文档示例通过 `jq .` 格式化展示。
+
+Server 可选配置 `data_dir` 指定持久化数据目录；原生运行时默认为 `~/.local/share/tbg`。Docker 示例明确设置为 `/var/lib/tbg`，与挂载卷保持一致。已实现能力和启动步骤见[项目 README](../../README.zh-CN.md)。
 
 ## 首次启动与管理员身份
 

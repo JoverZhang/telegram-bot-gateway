@@ -1,6 +1,6 @@
 # 操作能力总览
 
-状态：规划中，接口草案，尚未实现。[English](README.md)
+状态：部分实现，当前范围见[项目 README](../../README.zh-CN.md)。[English](README.md)
 
 Agent 使用 `tbg` CLI，User 使用 Telegram Bot。本文汇总两个入口的能力；通信场景和错误边界见[通信规范](communication.zh-CN.md)，配置、管理状态与交互见[管理规范](operations.zh-CN.md)。
 
