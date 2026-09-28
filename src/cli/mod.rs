@@ -12,15 +12,15 @@ struct Args {
 }
 pub async fn run() -> std::result::Result<(), String> {
     let mut a = Args::parse();
-    if let crate::contract::Command::Send { content, .. } = &mut a.command {
-        if content == "-" {
-            use std::io::Read;
-            let mut input = String::new();
-            std::io::stdin()
-                .read_to_string(&mut input)
-                .map_err(|error| format!("cannot read message from stdin: {error}"))?;
-            *content = input;
-        }
+    if let crate::contract::Command::Send { content, .. } = &mut a.command
+        && content == "-"
+    {
+        use std::io::Read;
+        let mut input = String::new();
+        std::io::stdin()
+            .read_to_string(&mut input)
+            .map_err(|error| format!("cannot read message from stdin: {error}"))?;
+        *content = input;
     }
     let request = crate::contract::Request::new(a.agent, a.command)?;
     let c = crate::config::ClientConfig::load()?;
