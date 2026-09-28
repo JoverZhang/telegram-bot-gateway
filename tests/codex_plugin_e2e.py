@@ -27,7 +27,7 @@ def run(root, tmp, env, topic, api, telegram, eventually, report):
     isolated = dict(env, XDG_DATA_HOME=str(data), CODEX_HOME=str(tmp / "codex"))
     checks = []
 
-    def hook(session="session-one", event="Stop", **overrides):
+    def hook(session="session-one", event="Stop", *, script_path=script, **overrides):
         payload = dict(
             hook_event_name=event,
             session_id=session,
@@ -35,7 +35,7 @@ def run(root, tmp, env, topic, api, telegram, eventually, report):
             **overrides,
         )
         result = subprocess.run(
-            ["python3", str(script)],
+            ["python3", str(script_path)],
             input=json.dumps(payload),
             env=isolated,
             text=True,
@@ -83,6 +83,17 @@ def run(root, tmp, env, topic, api, telegram, eventually, report):
     assert hook().stderr == ""
 
     # Exercise actionable failure diagnostics without disclosing remote response text.
+    malformed = subprocess.run(
+        ["python3", str(script)],
+        input="{",
+        env=isolated,
+        text=True,
+        capture_output=True,
+        timeout=5,
+    )
+    assert malformed.returncode == 0 and json.loads(malformed.stdout) == {}
+    assert "parse_event" in malformed.stderr
+
     config_path = state / "config.json"
     config_path.unlink()
     assert "load_config" in hook().stderr
@@ -185,6 +196,10 @@ def run(root, tmp, env, topic, api, telegram, eventually, report):
             )
         )
         assert cache and json.loads(cache[0].read_text())["hooks"]["Stop"]
+        # Execute the installed copy too: its sibling imports must survive caching.
+        hook(script_path=cache[0].parents[1] / "scripts/notify.py")
+        assert logs()[-1]["status"] == "accepted"
+        assert binding("session-one") == agent
         install("--uninstall")
         result = subprocess.run(
             ["codex", "plugin", "list", "--marketplace", "tbg-codex", "--json"],

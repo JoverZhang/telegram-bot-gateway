@@ -13,7 +13,12 @@ from notifications import (
 
 
 def parse_stop_event():
-    event = json.load(sys.stdin)
+    try:
+        event = json.load(sys.stdin)
+    except (OSError, ValueError) as error:
+        raise NotificationError(
+            "parse_event", "cannot read a valid JSON event"
+        ) from error
     if not isinstance(event, dict):
         raise NotificationError("parse_event", "expected a JSON object")
     if event.get("hook_event_name") != "Stop":

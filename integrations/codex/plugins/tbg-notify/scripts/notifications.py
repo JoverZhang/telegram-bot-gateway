@@ -52,15 +52,20 @@ def load_config():
 
 
 def save_config(config):
-    _save_private_json(data_root() / "config.json", asdict(config))
+    _save_private_json(data_root() / "config.json", asdict(config), "save_config")
 
 
-def _save_private_json(path, value):
-    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-    temporary = path.with_suffix(".tmp")
-    temporary.write_text(json.dumps(value, ensure_ascii=False) + "\n")
-    temporary.chmod(0o600)
-    temporary.replace(path)
+def _save_private_json(path, value, step):
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        temporary = path.with_suffix(".tmp")
+        temporary.write_text(json.dumps(value, ensure_ascii=False) + "\n")
+        temporary.chmod(0o600)
+        temporary.replace(path)
+    except OSError as error:
+        raise NotificationError(
+            step, f"cannot save {path}: {error.strerror}"
+        ) from error
 
 
 def _request_gateway(config, deadline, step, *args):
@@ -104,13 +109,23 @@ def _request_gateway(config, deadline, step, *args):
 def lock_session(session_id):
     key = hashlib.sha256(session_id.encode()).hexdigest()
     sessions = data_root() / "sessions"
-    sessions.mkdir(parents=True, exist_ok=True, mode=0o700)
-    with (sessions / f"{key}.lock").open("a") as lock:
+    try:
+        sessions.mkdir(parents=True, exist_ok=True, mode=0o700)
+        lock = (sessions / f"{key}.lock").open("a")
+    except OSError as error:
+        raise NotificationError(
+            "lock_session", f"cannot open Session lock: {error.strerror}"
+        ) from error
+    with lock:
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as error:
             raise NotificationError(
                 "lock_session", "another notification owns this Session"
+            ) from error
+        except OSError as error:
+            raise NotificationError(
+                "lock_session", f"cannot acquire Session lock: {error.strerror}"
             ) from error
         yield sessions / f"{key}.json"
 
@@ -137,7 +152,7 @@ def restore_or_register_agent(binding_path, config, deadline):
     agent = _request_gateway(config, deadline, "register_agent", "agent", "register")[
         "name"
     ]
-    _save_private_json(binding_path, {"agent": agent})
+    _save_private_json(binding_path, {"agent": agent}, "save_agent_binding")
     return agent
 
 
@@ -200,9 +215,9 @@ def check_topic(config):
 
 def record_delivery(record):
     root = data_root()
-    root.mkdir(parents=True, exist_ok=True, mode=0o700)
     record = {"time": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), **record}
     try:
+        root.mkdir(parents=True, exist_ok=True, mode=0o700)
         fd = os.open(
             root / "notifications.jsonl", os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600
         )
