@@ -58,6 +58,10 @@ send 成功表示消息和投递任务已在本地提交。后台投递支持重
 
 ## 任务结束通知
 
+使用[可安装的 Codex 插件](integrations/codex/README.zh-CN.md)接收主会话每轮结束通知，复用 Session 身份，并进行安装、状态检查、测试和卸载。试运行期间保留已有 Hooks。
+
+下方旧式 argv Hook 继续供现有调用方使用。
+
 Hook 是独立的 CLI 调用方。传入已注册的 Agent、已有 Topic 和通知 JSON，并确保 PATH 中有 `tbg`。它需要 Python 3，将 `agent-turn-complete` 事件的 `last-assistant-message` 转发出去，不自动重试结果不确定的发送。通知失败写入 stderr，不影响原任务的退出状态。
 
 ```sh
