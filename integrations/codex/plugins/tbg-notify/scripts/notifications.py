@@ -181,6 +181,7 @@ def send_turn_notification(session_id, content, agent, config, deadline):
         agent,
         "send",
         config.topic,
+        "--",
         content,
     )
     return {

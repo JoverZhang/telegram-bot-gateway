@@ -69,6 +69,18 @@ def run(root, tmp, env, topic, api, telegram, eventually, report):
         )
     )
     assert answer not in (state / "notifications.jsonl").read_text()
+    bullet_answer = "- Added tests\n- Updated docs"
+    hook(last_assistant_message=bullet_answer)
+    bullet_receipt = logs()[-1]
+    assert bullet_receipt["status"] == "accepted", (
+        "Leading bullet was parsed as a CLI option"
+    )
+    eventually(
+        lambda: any(
+            item.get("text") == f"{agent}:\n{bullet_answer}" for item in telegram.sends
+        )
+    )
+
     # Astral Unicode must respect Telegram's UTF-16 budget including attribution.
     long_answer = "🚀" * 3000
     hook(last_assistant_message=long_answer)
