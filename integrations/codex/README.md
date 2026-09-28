@@ -2,11 +2,11 @@
 
 [中文](README.zh-CN.md)
 
-A native Codex plugin sends a short notification through `tbg` when a main-session turn stops. It does not read Telegram replies, wake an Agent, report subagents, or claim the entire task is complete. Claude integration is not included.
+A native Codex plugin sends the final response through `tbg` when a main-session turn stops. It does not read Telegram replies, wake an Agent, report subagents, or claim the entire task is complete. Claude integration is not included.
 
 ## Install and verify
 
-Requires Linux/macOS, Python 3, a Codex CLI with `plugin` commands and trusted plugin Hooks (verified with 0.157.1), and the `tbg` CLI from this revision. Build the CLI with `cargo build --release --bin tbg` and install it on PATH. Configure `~/.config/tbg/client.yaml` and prepare an existing, open Topic on your running Gateway.
+Requires Linux/macOS, Python 3, a Codex CLI with `plugin` commands and trusted plugin Hooks (verified with 0.157.1), and the `tbg` CLI and Gateway from this revision (Markdown send support is required). Build the CLI with `cargo build --release --bin tbg` and install it on PATH. Configure `~/.config/tbg/client.yaml` and prepare an existing, open Topic on your running Gateway.
 
 ```sh
 ./integrations/codex/install.sh --topic <topic_id>
@@ -31,14 +31,24 @@ Stop → persistent Session/Agent binding → tbg send → durable Gateway outbo
 
 Each Codex `session_id` gets an automatically registered Agent on first use. Later processes and resumed sessions reuse that binding. Sessions are keyed by a hash, so event input cannot choose filesystem paths. Two simultaneous Hooks for the same Session do not race registration: a busy lock fails visibly instead of delaying Codex. Notifications do not create subscriptions.
 
-```text
-Codex turn finished
-Project: telegram-bot-gateway
-Agent: calm_turing
-Session: 019...
+The notification is sent as Markdown and rendered in Telegram:
+
+```markdown
+**Codex 本轮完成**
+项目：telegram-bot-gateway
+#agent_2f82684127a1
+
+Completed **successfully**.
+
+- Added tests
+- Updated docs
 ```
 
-The template sends project, Agent and Session identifiers, not the final answer or transcript. Project display names are capped at 120 characters. One Stop invocation sends one notification; replayed events can produce duplicates. Registration with an unknown outcome may leave an unused Agent. There is no exactly-once guarantee, automatic send retry or local offline queue.
+The body comes from the Stop event's `last_assistant_message`. Stop currently exposes no session title, so the heading is `Codex 本轮完成`. The project is the original Git repository name, including from linked worktrees; if Git lookup fails, the working directory name is used. The Session's Agent appears as a hashtag, with no duplicate Agent header. A missing, null or blank final response produces `Codex turn finished (no final response).`
+
+The plugin pipes content through stdin using `send <topic> - --format markdown --no-header`. Gateway converts Markdown to safe Telegram HTML: bold, italics, links, inline code and fenced code blocks are rendered; raw HTML is escaped. Quotes use a text prefix, and inline code inside a style or link retains that surrounding style. History preserves the full original Markdown. If the rendered preview exceeds Telegram's limit, only the preview is clipped, with `…（已截断）`; headers remain first and HTML stays balanced. The limit counts serialized HTML conservatively in UTF-16 units, so a heavily formatted message may be clipped earlier than plain text. Ordinary plain-text sends still reject oversized messages.
+
+One Stop invocation sends one notification; replayed events can produce duplicates. Registration with an unknown outcome may leave an unused Agent. There is no exactly-once guarantee, automatic send retry or local offline queue.
 
 State lives in `${XDG_DATA_HOME:-~/.local/share}/tbg/codex/`, outside the versioned plugin cache:
 
@@ -51,7 +61,7 @@ marketplace/          # stable plugin installation source
 
 Deleting Session state creates new identities on next use. Use separate data directories for separate Gateways; bindings belong to the Gateway where they were registered. No Bot token is stored here. Notification content is not written to the log.
 
-Registration and sending share a three-second budget. The adapter passes the remaining budget as `tbg --request-timeout-ms <positive_integer>`; HTTP request/body reading are bounded in the client. Codex's five-second Hook timeout is a final guard. Errors are logged and the adapter exits successfully with `{}`, without blocking Stop or injecting model instructions. Gateway acceptance makes delivery durable; failure before acceptance can lose a notification. A timed-out request may already have committed, so the plugin does not blindly retry.
+Project lookup, registration and sending share a three-second budget. Git lookup takes at most half a second and is best effort. The adapter passes the remaining budget as `tbg --request-timeout-ms <positive_integer>`; HTTP request/body reading are bounded in the client. Codex's five-second Hook timeout is a final guard. Errors are logged and the adapter exits successfully with `{}`, without blocking Stop or injecting model instructions. Gateway acceptance makes delivery durable; failure before acceptance can lose a notification. A timed-out request may already have committed, so the plugin does not blindly retry.
 
 Failures include the workflow step and safe diagnostics such as CLI exit/HTTP status. If the log cannot be written, stderr reports that separately; an accepted send remains accepted.
 

@@ -33,6 +33,7 @@ TOPIC
 
 COMMUNICATION
   send <topic> "<content>" [--quote <msg_id>]
+       [--format plain|markdown] [--no-header]
                                          发送消息；--quote 引用回复，正文支持 @
   unread <topic> [--cursor <msg_id>] [--limit <n>]
                                          从消费边界（最后一次 ack 的位置）之后顺序读取，可用 cursor 继续
@@ -68,6 +69,8 @@ Topic 是共享对话空间。Reply 保留回应关系，@ 表达希望谁关注
 unread 和 history 默认最多返回 20 条，`--cursor` 排除指定消息，沿命令的读取方向继续。每条消息包含 `msg_id`、发送时间、发送者及完整正文。Agent 应先读完后续对话再回应，并显式 ack 已处理的消息；读取和发送都不自动确认。消息字段、分页返回、订阅恢复及 wait 场景见[通信规范](communication.zh-CN.md)。
 
 已持久接收的消息按至少一次投递；`send` 成功表示 Gateway 已保存消息并负责投递。Agent 显式 ack 后，Bot 为相应 Telegram 消息添加 ❤️，表示至少一个 Agent 已确认。投递重试及回执失败的行为见通信规范。
+
+CLI 的 `send <topic> -` 从 stdin 读取 UTF-8 正文，避免命令行参数长度限制。CLI 在映射 HTTP 请求前完成读取；HTTP 正文字段中的 `-` 仍是普通文字。
 
 可选全局参数 `--request-timeout-ms <正整数>` 限制客户端整个 HTTP 请求，包括响应体读取和 `wait`。它属于本地传输设置，不映射为 HTTP 命令参数。省略时保留持续等待和普通请求原有的超时行为。超时不代表写入未被接受，不应盲目重发。
 

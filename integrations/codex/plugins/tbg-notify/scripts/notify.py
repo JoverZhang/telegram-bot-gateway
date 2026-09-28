@@ -3,6 +3,7 @@
 
 import json
 import sys
+from dataclasses import dataclass
 
 from notifications import (
     NotificationError,
@@ -10,6 +11,13 @@ from notifications import (
     deliver_notification,
     record_delivery,
 )
+
+
+@dataclass(frozen=True)
+class StopNotification:
+    session_id: str
+    content: str
+    cwd: str
 
 
 def parse_stop_event():
@@ -28,10 +36,17 @@ def parse_stop_event():
         raise NotificationError(
             "parse_event", "session_id must contain 1–256 characters"
         )
+    content = event.get("last_assistant_message")
+    if content is not None and not isinstance(content, str):
+        raise NotificationError(
+            "parse_event", "last_assistant_message must be a string or null"
+        )
+    if content is None or not content.strip():
+        content = "Codex turn finished (no final response)."
     cwd = event.get("cwd") or "."
     if not isinstance(cwd, str):
         raise NotificationError("parse_event", "cwd must be a string")
-    return session, cwd
+    return StopNotification(session, content, cwd)
 
 
 def report_failure(error, session_id):
@@ -63,9 +78,9 @@ def main():
         event = parse_stop_event()
 
         if event is not None:
-            deliver_notification(*event)
+            deliver_notification(event.session_id, event.content, event.cwd)
     except Exception as error:
-        report_failure(error, event[0] if event else None)
+        report_failure(error, event.session_id if event else None)
     finally:
         # The outer Hook boundary deliberately handles unexpected failures too.
         print("{}")

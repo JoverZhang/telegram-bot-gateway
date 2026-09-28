@@ -9,6 +9,7 @@ license = "Apache-2.0"
 test-support = []
 
 [dependencies]
+pulldown-cmark = { version = "0.13.4", default-features = false }
 axum = "0.8"
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4", features = ["derive"] }

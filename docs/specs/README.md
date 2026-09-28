@@ -33,6 +33,7 @@ TOPIC
 
 COMMUNICATION
   send <topic> "<content>" [--quote <msg_id>]
+       [--format plain|markdown] [--no-header]
                                          Send a message; --quote replies to a message; the body supports @
   unread <topic> [--cursor <msg_id>] [--limit <n>]
                                          Read forward after the consumption boundary (last ack position); use cursor to continue
@@ -68,6 +69,8 @@ A Topic is a shared conversation space. Reply preserves the relationship between
 Unread and history return at most 20 messages by default. `--cursor` excludes the specified message and continues in the command's reading direction. Each message includes its `msg_id`, sending time, sender, and full content. Agents should read the subsequent conversation before responding and explicitly acknowledge messages they have processed; reading and sending never acknowledge automatically. See the [communication specification](communication.md) for message fields, pagination responses, subscription resumption, and wait scenarios.
 
 Durably accepted messages use at-least-once delivery. A successful `send` means the Gateway has stored the message and taken responsibility for delivery. After an explicit Agent ack, the Bot adds ❤️ to the corresponding Telegram messages, meaning at least one Agent has acknowledged them. Delivery retries and receipt failures follow the communication specification.
+
+For the CLI, `send <topic> -` reads UTF-8 content from stdin, avoiding shell argument-size limits. The CLI resolves this before HTTP mapping; a literal `-` in an HTTP content field remains ordinary text.
 
 Optional global `--request-timeout-ms <positive_integer>` bounds the entire client HTTP request, including response-body reading and `wait`. It is a local transport option, not an HTTP command parameter. Omitting it preserves continuous wait and the ordinary request timeout. A timeout does not prove that a write was rejected; do not blindly resend.
 

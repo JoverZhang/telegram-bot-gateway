@@ -73,6 +73,20 @@ def resolve_install_config(request):
     )
     if "--request-timeout-ms" not in result.stdout:
         raise ValueError("tbg is too old; install the CLI shipped with this plugin")
+    send_help = subprocess.run(
+        [executable, "send", "--help"],
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=3,
+    )
+    if any(
+        option not in send_help.stdout
+        for option in ("--format", "--no-header", "stdin")
+    ):
+        raise ValueError(
+            "tbg is too old; install a CLI and Gateway with Markdown send and stdin support"
+        )
     return NotificationConfig(request.topic, executable)
 
 
@@ -136,7 +150,10 @@ def show_status():
 
 
 def send_test_notification():
-    receipt = deliver_notification(f"test-{uuid.uuid4()}", str(Path.cwd()), test=True)
+    receipt = deliver_notification(
+        f"test-{uuid.uuid4()}",
+        "TBG notification test.\n\nFinal-response content will appear here.",
+    )
     print(json.dumps(receipt, indent=2))
     print("Gateway accepted the message. Verify delivery in Telegram.")
 

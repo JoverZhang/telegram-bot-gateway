@@ -32,8 +32,8 @@ def run(root, tmp, env, topic, api, telegram, eventually, report):
             hook_event_name=event,
             session_id=session,
             cwd="/projects/example",
-            **overrides,
         )
+        payload.update(overrides)
         result = subprocess.run(
             ["python3", str(script_path)],
             input=json.dumps(payload),
@@ -55,18 +55,168 @@ def run(root, tmp, env, topic, api, telegram, eventually, report):
             for line in (state / "notifications.jsonl").read_text().splitlines()
         ]
 
-    hook(last_assistant_message="private answer should not be sent")
+    answer = "Completed **successfully**.\n\n- Added tests\n- Updated docs"
+    hook(last_assistant_message=answer)
     first = logs()[-1]
     assert first["status"] == "accepted"
     agent = binding("session-one")
-    eventually(
-        lambda: any(
-            "Session: session-one" in item.get("text", "") for item in telegram.sends
+    messages = api("history", agent=agent, topic=topic)["messages"]
+    delivered = next(m for m in messages if m["msg_id"] == first["msg_id"])
+    expected = f"**Codex 本轮完成**\n项目：example\n#{agent}\n\n{answer}"
+    assert delivered["content"] == expected, (
+        "Notification is missing title/project/Agent tag"
+    )
+    rendered = eventually(
+        lambda: next(
+            (item for item in telegram.sends if f"#{agent}" in item.get("text", "")),
+            None,
         )
     )
-    messages = api("history", agent=agent, topic=topic)["messages"]
-    assert any(m["msg_id"] == first["msg_id"] for m in messages)
-    assert "private answer" not in json.dumps(messages)
+    assert rendered["parse_mode"] == "HTML"
+    assert rendered["text"].startswith("<b>Codex 本轮完成</b>\n项目：example\n#")
+    assert "Completed <b>successfully</b>." in rendered["text"]
+    assert "• Added tests" in rendered["text"]
+    assert "<pre>" not in rendered["text"]
+    assert not rendered["text"].startswith(f"{agent}:")
+    assert all(
+        answer not in value
+        for record in logs()
+        for value in record.values()
+        if isinstance(value, str)
+    )
+    bullet_answer = "- Added tests\n- Updated docs"
+    hook(last_assistant_message=bullet_answer)
+    bullet_receipt = logs()[-1]
+    assert bullet_receipt["status"] == "accepted", (
+        "Leading bullet was parsed as a CLI option"
+    )
+    eventually(
+        lambda: any(
+            item.get("text", "").endswith("• Added tests\n• Updated docs")
+            and f"#{agent}" in item["text"]
+            for item in telegram.sends
+        )
+    )
+
+    # Store the full answer; bound only Telegram's rendered preview.
+    long_answer = "🚀" * 40000  # Exceeds Linux's per-argument size limit; use stdin.
+    hook(last_assistant_message=long_answer)
+    long_receipt = logs()[-1]
+    stored = next(
+        m
+        for m in api("history", agent=agent, topic=topic)["messages"]
+        if m["msg_id"] == long_receipt["msg_id"]
+    )["content"]
+    assert stored.endswith(long_answer)
+    preview = eventually(
+        lambda: next(
+            (item for item in telegram.sends if "🚀" in item.get("text", "")),
+            None,
+        )
+    )["text"]
+    assert preview.startswith("<b>Codex 本轮完成</b>\n项目：example\n#")
+    assert preview.endswith("\n\n…（已截断）") and "\ufffd" not in preview
+    assert len(preview.encode("utf-16-le")) // 2 <= 4096
+
+    rich_answer = (
+        "[Docs](https://example.com/?a=1&b=2) and `x < y`\n\n"
+        '```python\nprint("<ok>")\n```\n\n'
+        "**bold `inline`**\n\n> quote\n> > nested\n\n"
+        '<script>alert("unsafe")</script>\n\n[unsafe](javascript:alert)'
+    )
+    hook(last_assistant_message=rich_answer)
+    rich = eventually(
+        lambda: next(
+            (item for item in telegram.sends if "alert" in item.get("text", "")),
+            None,
+        )
+    )["text"]
+    assert '<a href="https://example.com/?a=1&amp;b=2">Docs</a>' in rich
+    assert "<code>x &lt; y</code>" in rich
+    assert (
+        '<pre><code class="language-python">print("&lt;ok&gt;")\n</code></pre>' in rich
+    )
+    assert "<b>bold inline</b>" in rich and "<blockquote>" not in rich
+    assert "&lt;script&gt;" in rich and "<script>" not in rich
+    assert 'href="javascript:' not in rich
+
+    # Escape-heavy content must not cause truncation to discard the header.
+    hook(last_assistant_message="&" * 10000)
+    escaped = eventually(
+        lambda: next(
+            (
+                item["text"]
+                for item in telegram.sends
+                if "&amp;" * 20 in item.get("text", "")
+            ),
+            None,
+        )
+    )
+    assert escaped.startswith("<b>Codex 本轮完成</b>\n项目：example\n#")
+    assert f"#{agent}" in escaped
+    assert escaped.endswith("…（已截断）")
+    assert len(escaped.encode("utf-16-le")) // 2 <= 4096
+
+    # Reject empty rendered content before creating an undeliverable outbox row.
+    empty = subprocess.run(
+        [
+            config["tbg_path"],
+            "--agent",
+            agent,
+            "send",
+            topic,
+            "--format",
+            "markdown",
+            "--no-header",
+            "--",
+            "```\n```",
+        ],
+        env=isolated,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert empty.returncode != 0 and "nonempty text" in empty.stderr
+
+    # Linked worktree paths must display the original repository name.
+    repository = tmp / "sample_project"
+    repository.mkdir()
+    subprocess.run(["git", "init", str(repository)], check=True, capture_output=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repository),
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "--allow-empty",
+            "-m",
+            "initial",
+        ],
+        check=True,
+        capture_output=True,
+    )
+    worktree = tmp / "task_branch"
+    subprocess.run(
+        ["git", "-C", str(repository), "worktree", "add", str(worktree)],
+        check=True,
+        capture_output=True,
+    )
+    hook(cwd=str(worktree), last_assistant_message="Worktree identity verified.")
+    eventually(
+        lambda: any(
+            "项目：sample_project" in item.get("text", "")
+            and "Worktree identity verified." in item["text"]
+            for item in telegram.sends
+        )
+    )
+    checks.append(
+        "rich Markdown, safe HTML, full history with bounded preview, original worktree project"
+    )
+
     hook()  # Another process, same Session.
     assert binding("session-one") == agent
     hook("session-two")
@@ -75,12 +225,18 @@ def run(root, tmp, env, topic, api, telegram, eventually, report):
     hook(event="SubagentStop")
     assert len(logs()) == before
     checks.append(
-        "real CLI delivery, Session persistence/isolation, main Stop only, no answer disclosure"
+        "real CLI delivery, Session persistence/isolation, main Stop only, final answer forwarding with title/project/tag and no content in logs"
     )
 
     hook(session="")
     assert logs()[-1]["status"] == "failed"
-    assert hook().stderr == ""
+    assert hook(last_assistant_message=None).stderr == ""
+    fallback = logs()[-1]
+    assert next(
+        m
+        for m in api("history", agent=agent, topic=topic)["messages"]
+        if m["msg_id"] == fallback["msg_id"]
+    )["content"].endswith("Codex turn finished (no final response).")
 
     # Exercise actionable failure diagnostics without disclosing remote response text.
     malformed = subprocess.run(

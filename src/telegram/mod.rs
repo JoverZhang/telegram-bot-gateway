@@ -1,3 +1,4 @@
+pub(crate) mod formatting;
 mod updates;
 use serde_json::{Value, json};
 pub(crate) use updates::{Event, TopicEvent, Update};
@@ -107,10 +108,14 @@ impl TelegramClient {
         match delivery {
             Delivery::Send {
                 text,
+                parse_mode,
                 thread,
                 quote,
             } => {
                 let mut payload = json!({"chat_id":chat,"text":text});
+                if let Some(mode) = parse_mode {
+                    payload["parse_mode"] = json!(mode);
+                }
                 if let Some(thread) = thread {
                     payload["message_thread_id"] = json!(thread);
                 }
