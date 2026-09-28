@@ -31,22 +31,24 @@ Stop → persistent Session/Agent binding → tbg send → durable Gateway outbo
 
 Each Codex `session_id` gets an automatically registered Agent on first use. Later processes and resumed sessions reuse that binding. Sessions are keyed by a hash, so event input cannot choose filesystem paths. Two simultaneous Hooks for the same Session do not race registration: a busy lock fails visibly instead of delaying Codex. Notifications do not create subscriptions.
 
-The notification is sent as Markdown and rendered in Telegram:
+The title, project and Agent hashtag appear above a code block containing the literal final response:
 
-```markdown
+````markdown
 **Codex 本轮完成**
 项目：telegram-bot-gateway
 #agent_2f82684127a1
 
+```
 Completed **successfully**.
 
 - Added tests
 - Updated docs
 ```
+````
 
 The body comes from the Stop event's `last_assistant_message`. Stop currently exposes no session title, so the heading is `Codex 本轮完成`. The project is the original Git repository name, including from linked worktrees; if Git lookup fails, the working directory name is used. The Session's Agent appears as a hashtag, with no duplicate Agent header. A missing, null or blank final response produces `Codex turn finished (no final response).`
 
-The plugin uses `send --format markdown --no-header`. Gateway converts Markdown to safe Telegram HTML: bold, italics, links, inline code and fenced code blocks are rendered; raw HTML is escaped. Quotes use a text prefix, and inline code inside a style or link retains that surrounding style. History preserves the full original Markdown. If the rendered preview exceeds Telegram's limit, only the preview is clipped, with `…（已截断）`; headers remain first and HTML stays balanced. The limit counts serialized HTML conservatively in UTF-16 units, so a heavily formatted message may be clipped earlier than plain text. Ordinary plain-text sends still reject oversized messages.
+The plugin uses `send --format markdown --no-header`, with the final answer enclosed in a fenced code block. Markdown symbols, lists and nested code fences in the answer stay literal; only the heading is styled. The enclosing fence is longer than any backtick run in the answer, so embedded fences cannot break out of the block. Gateway converts the wrapper into safe Telegram HTML and escapes the body. History preserves the complete notification source. If the Telegram preview exceeds the limit, only the preview is clipped, with `…（已截断）` outside the code block; the title, project and hashtag remain visible. The limit counts serialized HTML conservatively in UTF-16 units, so escaping can cause earlier clipping. Ordinary plain-text sends still reject oversized messages.
 
 One Stop invocation sends one notification; replayed events can produce duplicates. Registration with an unknown outcome may leave an unused Agent. There is no exactly-once guarantee, automatic send retry or local offline queue.
 

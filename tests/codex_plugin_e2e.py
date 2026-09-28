@@ -62,7 +62,7 @@ def run(root, tmp, env, topic, api, telegram, eventually, report):
     agent = binding("session-one")
     messages = api("history", agent=agent, topic=topic)["messages"]
     delivered = next(m for m in messages if m["msg_id"] == first["msg_id"])
-    expected = f"**Codex 本轮完成**\n项目：example\n#{agent}\n\n{answer}"
+    expected = f"**Codex 本轮完成**\n项目：example\n#{agent}\n\n```\n{answer}\n```"
     assert delivered["content"] == expected, (
         "Notification is missing title/project/Agent tag"
     )
@@ -74,8 +74,8 @@ def run(root, tmp, env, topic, api, telegram, eventually, report):
     )
     assert rendered["parse_mode"] == "HTML"
     assert rendered["text"].startswith("<b>Codex 本轮完成</b>\n项目：example\n#")
-    assert "Completed <b>successfully</b>." in rendered["text"]
-    assert "• Added tests" in rendered["text"]
+    assert f"<pre>{answer}\n</pre>" in rendered["text"]
+    assert "Completed <b>successfully</b>." not in rendered["text"]
     assert not rendered["text"].startswith(f"{agent}:")
     assert all(
         answer not in value
@@ -91,7 +91,7 @@ def run(root, tmp, env, topic, api, telegram, eventually, report):
     )
     eventually(
         lambda: any(
-            item.get("text", "").endswith("• Added tests\n• Updated docs")
+            f"<pre>{bullet_answer}\n</pre>" in item.get("text", "")
             and f"#{agent}" in item["text"]
             for item in telegram.sends
         )
@@ -106,7 +106,7 @@ def run(root, tmp, env, topic, api, telegram, eventually, report):
         for m in api("history", agent=agent, topic=topic)["messages"]
         if m["msg_id"] == long_receipt["msg_id"]
     )["content"]
-    assert stored.endswith(long_answer)
+    assert f"\n{long_answer}\n" in stored
     preview = eventually(
         lambda: next(
             (item for item in telegram.sends if "🚀" in item.get("text", "")),
@@ -130,14 +130,49 @@ def run(root, tmp, env, topic, api, telegram, eventually, report):
             None,
         )
     )["text"]
-    assert '<a href="https://example.com/?a=1&amp;b=2">Docs</a>' in rich
-    assert "<code>x &lt; y</code>" in rich
-    assert (
-        '<pre><code class="language-python">print("&lt;ok&gt;")\n</code></pre>' in rich
-    )
-    assert "<b>bold inline</b>" in rich and "<blockquote>" not in rich
+    assert "<pre>" in rich and "</pre>" in rich
+    assert "[Docs](https://example.com/?a=1&amp;b=2)" in rich
+    assert "**bold `inline`**" in rich and "```python" in rich
     assert "&lt;script&gt;" in rich and "<script>" not in rich
-    assert 'href="javascript:' not in rich
+    assert "<a href=" not in rich and "<code>" not in rich
+
+    # Escape-heavy content must not cause truncation to discard the header.
+    hook(last_assistant_message="&" * 10000)
+    escaped = eventually(
+        lambda: next(
+            (
+                item["text"]
+                for item in telegram.sends
+                if "&amp;" * 20 in item.get("text", "")
+            ),
+            None,
+        )
+    )
+    assert escaped.startswith("<b>Codex 本轮完成</b>\n项目：example\n#")
+    assert f"#{agent}" in escaped and "<pre>" in escaped and "</pre>" in escaped
+    assert escaped.endswith("…（已截断）")
+    assert len(escaped.encode("utf-16-le")) // 2 <= 4096
+
+    # Reject empty rendered content before creating an undeliverable outbox row.
+    empty = subprocess.run(
+        [
+            config["tbg_path"],
+            "--agent",
+            agent,
+            "send",
+            topic,
+            "--format",
+            "markdown",
+            "--no-header",
+            "--",
+            "```\n```",
+        ],
+        env=isolated,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert empty.returncode != 0 and "nonempty text" in empty.stderr
 
     # Linked worktree paths must display the original repository name.
     repository = tmp / "sample_project"
@@ -175,7 +210,7 @@ def run(root, tmp, env, topic, api, telegram, eventually, report):
         )
     )
     checks.append(
-        "rich Markdown, safe HTML, full history with bounded preview, original worktree project"
+        "literal code-block body, safe HTML, full history with bounded preview, original worktree project"
     )
 
     hook()  # Another process, same Session.
@@ -197,7 +232,7 @@ def run(root, tmp, env, topic, api, telegram, eventually, report):
         m
         for m in api("history", agent=agent, topic=topic)["messages"]
         if m["msg_id"] == fallback["msg_id"]
-    )["content"].endswith("Codex turn finished (no final response).")
+    )["content"].endswith("Codex turn finished (no final response).\n```")
 
     # Exercise actionable failure diagnostics without disclosing remote response text.
     malformed = subprocess.run(

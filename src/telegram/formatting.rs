@@ -16,6 +16,18 @@ pub(crate) fn message(
         return Err(Error::bad("message must be nonempty"));
     }
     if matches!(format, Some(MessageFormat::Markdown)) {
+        let has_text =
+            Parser::new_ext(content, Options::ENABLE_TASKLISTS).any(|event| match event {
+                Event::Text(text)
+                | Event::Code(text)
+                | Event::Html(text)
+                | Event::InlineHtml(text) => !text.trim().is_empty(),
+                Event::Rule | Event::TaskListMarker(_) => true,
+                _ => false,
+            });
+        if !has_text {
+            return Err(Error::bad("Markdown message must render nonempty text"));
+        }
         let header = if no_header {
             String::new()
         } else {
@@ -28,9 +40,6 @@ pub(crate) fn message(
             ));
         }
         let rendered = render_bounded(content, budget);
-        if rendered.trim().is_empty() {
-            return Err(Error::bad("Markdown message must render nonempty text"));
-        }
         return Ok((format!("{header}{rendered}"), Some("HTML".into())));
     }
     let text = if no_header {
@@ -65,7 +74,13 @@ fn render_bounded(raw: &str, budget: usize) -> String {
         if units <= budget {
             return rendered;
         }
-        let shrink = (units - budget).div_ceil(2).max(keep / 8).max(1);
+        // Escaping can expand source text several-fold. Never discard the whole
+        // prefix based on expanded length; retain half and render again.
+        let shrink = (units - budget)
+            .div_ceil(2)
+            .max(keep / 8)
+            .max(1)
+            .min((keep / 2).max(1));
         keep = keep.saturating_sub(shrink);
     }
 }

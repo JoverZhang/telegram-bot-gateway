@@ -190,7 +190,12 @@ def format_notification(agent, project, content):
     project = " ".join(project.splitlines())[:120]
     project = re.sub(r"([\\`*_{}\[\]()#+.!<>|~-])", r"\\\1", project)
     # Stop events currently expose no session title; use the agreed fallback.
-    return f"**Codex 本轮完成**\n项目：{project}\n#{agent}\n\n{content}"
+    fence = "`" * max(
+        3, max((len(run) + 1 for run in re.findall(r"`+", content)), default=0)
+    )
+    return (
+        f"**Codex 本轮完成**\n项目：{project}\n#{agent}\n\n{fence}\n{content}\n{fence}"
+    )
 
 
 def send_turn_notification(session_id, content, agent, config, deadline):
@@ -218,7 +223,7 @@ def send_turn_notification(session_id, content, agent, config, deadline):
 
 
 def deliver_notification(session_id, content, cwd="."):
-    # Sends a titled Markdown response under the Session's Agent tag.
+    # Sends the literal response in a code block under the Session's Agent tag.
     config = load_config()
 
     deadline = time.monotonic() + 3
