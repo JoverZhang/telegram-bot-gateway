@@ -2,7 +2,7 @@
 
 [中文](README.zh-CN.md)
 
-A native Codex plugin sends a short notification through `tbg` when a main-session turn stops. It does not read Telegram replies, wake an Agent, report subagents, or claim the entire task is complete. Claude integration is not included.
+A native Codex plugin sends the final response through `tbg` when a main-session turn stops. It does not read Telegram replies, wake an Agent, report subagents, or claim the entire task is complete. Claude integration is not included.
 
 ## Install and verify
 
@@ -32,13 +32,16 @@ Stop → persistent Session/Agent binding → tbg send → durable Gateway outbo
 Each Codex `session_id` gets an automatically registered Agent on first use. Later processes and resumed sessions reuse that binding. Sessions are keyed by a hash, so event input cannot choose filesystem paths. Two simultaneous Hooks for the same Session do not race registration: a busy lock fails visibly instead of delaying Codex. Notifications do not create subscriptions.
 
 ```text
-Codex turn finished
-Project: telegram-bot-gateway
-Agent: calm_turing
-Session: 019...
+calm_turing:
+Completed the refactor.
+
+- Added tests
+- Updated docs
 ```
 
-The template sends project, Agent and Session identifiers, not the final answer or transcript. Project display names are capped at 120 characters. One Stop invocation sends one notification; replayed events can produce duplicates. Registration with an unknown outcome may leave an unused Agent. There is no exactly-once guarantee, automatic send retry or local offline queue.
+The body is the Stop event's `last_assistant_message`, without a project title, completion heading or Session metadata. Gateway adds the Agent attribution. Text and newlines are preserved; Markdown is sent as plain text, not converted to Telegram rich formatting. A missing, null or blank final response produces `Codex turn finished (no final response).`
+
+Oversized notification text is clipped with `… (truncated)`, accounting for Telegram's 4096 UTF-16 unit limit and the Agent header, without splitting Unicode surrogate pairs. This only bounds this notification copy; it does not change the Codex transcript or Gateway's general `send` rejection policy. One Stop invocation sends one notification; replayed events can produce duplicates. Registration with an unknown outcome may leave an unused Agent. There is no exactly-once guarantee, automatic send retry or local offline queue.
 
 State lives in `${XDG_DATA_HOME:-~/.local/share}/tbg/codex/`, outside the versioned plugin cache:
 

@@ -156,10 +156,23 @@ def restore_or_register_agent(binding_path, config, deadline):
     return agent
 
 
-def send_turn_notification(session_id, cwd, agent, config, deadline, *, test):
-    title = "TBG notification test" if test else "Codex turn finished"
-    project = Path(cwd).name[:120]
-    content = f"{title}\nProject: {project}\nAgent: {agent}\nSession: {session_id}"
+def fit_notification(content, agent):
+    # Match Gateway's UTF-16 limit, including its "Agent:\n" attribution.
+    budget = 4096 - len(f"{agent}:\n".encode("utf-16-le")) // 2
+    encoded = content.encode("utf-16-le")
+    if len(encoded) // 2 <= budget:
+        return content
+    marker = "\n\n… (truncated)"
+    prefix_budget = budget - len(marker.encode("utf-16-le")) // 2
+    if prefix_budget < 0:
+        raise NotificationError(
+            "format_notification", "Agent header leaves no room for a notification"
+        )
+    return encoded[: prefix_budget * 2].decode("utf-16-le", errors="ignore") + marker
+
+
+def send_turn_notification(session_id, content, agent, config, deadline):
+    content = fit_notification(content, agent)
     response = _request_gateway(
         config,
         deadline,
@@ -179,17 +192,15 @@ def send_turn_notification(session_id, cwd, agent, config, deadline, *, test):
     }
 
 
-def deliver_notification(session_id, cwd, *, test=False):
-    # Sends one short signal using the Session's persistent Agent identity.
+def deliver_notification(session_id, content):
+    # Sends the final response using the Session's persistent Agent identity.
     config = load_config()
 
     deadline = time.monotonic() + 3
     with lock_session(session_id) as binding_path:
         agent = restore_or_register_agent(binding_path, config, deadline)
 
-        receipt = send_turn_notification(
-            session_id, cwd, agent, config, deadline, test=test
-        )
+        receipt = send_turn_notification(session_id, content, agent, config, deadline)
 
     record_delivery(receipt)
 

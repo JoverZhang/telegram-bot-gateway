@@ -55,18 +55,38 @@ def run(root, tmp, env, topic, api, telegram, eventually, report):
             for line in (state / "notifications.jsonl").read_text().splitlines()
         ]
 
-    hook(last_assistant_message="private answer should not be sent")
+    answer = "Completed **successfully**.\n\n- Added tests\n- Updated docs"
+    hook(last_assistant_message=answer)
     first = logs()[-1]
     assert first["status"] == "accepted"
     agent = binding("session-one")
+    messages = api("history", agent=agent, topic=topic)["messages"]
+    delivered = next(m for m in messages if m["msg_id"] == first["msg_id"])
+    assert delivered["content"] == answer, "Stop notification dropped the final answer"
     eventually(
         lambda: any(
-            "Session: session-one" in item.get("text", "") for item in telegram.sends
+            item.get("text") == f"{agent}:\n{answer}" for item in telegram.sends
         )
     )
-    messages = api("history", agent=agent, topic=topic)["messages"]
-    assert any(m["msg_id"] == first["msg_id"] for m in messages)
-    assert "private answer" not in json.dumps(messages)
+    assert answer not in (state / "notifications.jsonl").read_text()
+    # Astral Unicode must respect Telegram's UTF-16 budget including attribution.
+    long_answer = "🚀" * 3000
+    hook(last_assistant_message=long_answer)
+    long_receipt = logs()[-1]
+    truncated = next(
+        m
+        for m in api("history", agent=agent, topic=topic)["messages"]
+        if m["msg_id"] == long_receipt["msg_id"]
+    )["content"]
+    assert truncated.endswith("\n\n… (truncated)")
+    assert truncated.startswith("🚀") and "\ufffd" not in truncated
+    assert len(f"{agent}:\n{truncated}".encode("utf-16-le")) // 2 <= 4096
+    eventually(
+        lambda: any(
+            item.get("text") == f"{agent}:\n{truncated}" for item in telegram.sends
+        )
+    )
+
     hook()  # Another process, same Session.
     assert binding("session-one") == agent
     hook("session-two")
@@ -75,12 +95,21 @@ def run(root, tmp, env, topic, api, telegram, eventually, report):
     hook(event="SubagentStop")
     assert len(logs()) == before
     checks.append(
-        "real CLI delivery, Session persistence/isolation, main Stop only, no answer disclosure"
+        "real CLI delivery, Session persistence/isolation, main Stop only, final answer forwarding without metadata or log disclosure"
     )
 
     hook(session="")
     assert logs()[-1]["status"] == "failed"
-    assert hook().stderr == ""
+    assert hook(last_assistant_message=None).stderr == ""
+    fallback = logs()[-1]
+    assert (
+        next(
+            m
+            for m in api("history", agent=agent, topic=topic)["messages"]
+            if m["msg_id"] == fallback["msg_id"]
+        )["content"]
+        == "Codex turn finished (no final response)."
+    )
 
     # Exercise actionable failure diagnostics without disclosing remote response text.
     malformed = subprocess.run(

@@ -2,7 +2,7 @@
 
 [English](README.md)
 
-这是原生 Codex 插件：主会话每轮停止时，通过 `tbg` 发送一条简短通知。它不读取 Telegram 回复、不唤起 Agent、不报告子 Agent，也不将本轮结束视为整个任务完成。首版不包含 Claude 适配。
+这是原生 Codex 插件：主会话每轮停止时，通过 `tbg` 发送本轮最终回答。它不读取 Telegram 回复、不唤起 Agent、不报告子 Agent，也不将本轮结束视为整个任务完成。首版不包含 Claude 适配。
 
 ## 安装与验证
 
@@ -32,13 +32,16 @@ Stop → 持久化的 Session/Agent 绑定 → tbg send → Gateway 持久化投
 每个 Codex `session_id` 首次使用时自动注册 Agent，后续进程和恢复后的会话复用绑定。Session 使用哈希作为文件名，事件输入不能决定文件路径。同一 Session 并发执行 Hook 时，忙锁会报告失败，避免重复注册或阻塞 Codex。通知不会建立订阅。
 
 ```text
-Codex turn finished
-Project: telegram-bot-gateway
-Agent: calm_turing
-Session: 019...
+calm_turing:
+已完成重构。
+
+- 添加了测试
+- 更新了文档
 ```
 
-固定模板发送项目、Agent 和 Session 标识，不发送最终回答或 transcript。项目展示名称最多 120 个字符。一次 Stop 调用发送一条通知；重放事件可能重复发送。注册结果不明确时可能遗留未使用的 Agent。不承诺恰好一次，不自动重试发送，也没有本地离线队列。
+正文取自 Stop 事件的 `last_assistant_message`，不附加项目标题、完成提示或 Session 元数据，由 Gateway 添加 Agent 署名。保留原文和换行；Markdown 以纯文本发送，暂不转换成 Telegram 富文本格式。最终回答缺失、为 null 或空白时，发送 `Codex turn finished (no final response).`。
+
+超长通知明确标记 `… (truncated)`，按 Telegram 的 4096 个 UTF-16 单元限制计算，并预留 Agent 署名空间，不切断 Unicode 代理对。这只限制通知副本，不修改 Codex transcript，也不改变 Gateway 普通 `send` 对超长消息的拒绝规则。一次 Stop 调用发送一条通知；重放事件可能重复发送。注册结果不明确时可能遗留未使用的 Agent。不承诺恰好一次，不自动重试发送，也没有本地离线队列。
 
 状态保存在 `${XDG_DATA_HOME:-~/.local/share}/tbg/codex/`，独立于插件版本缓存：
 

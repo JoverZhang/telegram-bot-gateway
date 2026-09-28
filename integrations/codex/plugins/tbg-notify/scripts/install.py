@@ -136,7 +136,10 @@ def show_status():
 
 
 def send_test_notification():
-    receipt = deliver_notification(f"test-{uuid.uuid4()}", str(Path.cwd()), test=True)
+    receipt = deliver_notification(
+        f"test-{uuid.uuid4()}",
+        "TBG notification test.\n\nFinal-response content will appear here.",
+    )
     print(json.dumps(receipt, indent=2))
     print("Gateway accepted the message. Verify delivery in Telegram.")
 
