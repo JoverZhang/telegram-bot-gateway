@@ -53,6 +53,8 @@ Deleting Session state creates new identities on next use. Use separate data dir
 
 Registration and sending share a three-second budget. The adapter passes the remaining budget as `tbg --request-timeout-ms <positive_integer>`; HTTP request/body reading are bounded in the client. Codex's five-second Hook timeout is a final guard. Errors are logged and the adapter exits successfully with `{}`, without blocking Stop or injecting model instructions. Gateway acceptance makes delivery durable; failure before acceptance can lose a notification. A timed-out request may already have committed, so the plugin does not blindly retry.
 
+Failures include the workflow step and safe diagnostics such as CLI exit/HTTP status. If the log cannot be written, stderr reports that separately; an accepted send remains accepted.
+
 ## Verify changes
 
 ```sh
