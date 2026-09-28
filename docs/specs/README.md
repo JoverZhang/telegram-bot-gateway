@@ -33,6 +33,7 @@ TOPIC
 
 COMMUNICATION
   send <topic> "<content>" [--quote <msg_id>]
+       [--format plain|markdown] [--no-header]
                                          Send a message; --quote replies to a message; the body supports @
   unread <topic> [--cursor <msg_id>] [--limit <n>]
                                          Read forward after the consumption boundary (last ack position); use cursor to continue

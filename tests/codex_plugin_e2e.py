@@ -32,8 +32,8 @@ def run(root, tmp, env, topic, api, telegram, eventually, report):
             hook_event_name=event,
             session_id=session,
             cwd="/projects/example",
-            **overrides,
         )
+        payload.update(overrides)
         result = subprocess.run(
             ["python3", str(script_path)],
             input=json.dumps(payload),
@@ -62,12 +62,21 @@ def run(root, tmp, env, topic, api, telegram, eventually, report):
     agent = binding("session-one")
     messages = api("history", agent=agent, topic=topic)["messages"]
     delivered = next(m for m in messages if m["msg_id"] == first["msg_id"])
-    assert delivered["content"] == answer, "Stop notification dropped the final answer"
-    eventually(
-        lambda: any(
-            item.get("text") == f"{agent}:\n{answer}" for item in telegram.sends
+    expected = f"**Codex 本轮完成**\n项目：example\n#{agent}\n\n{answer}"
+    assert delivered["content"] == expected, (
+        "Notification is missing title/project/Agent tag"
+    )
+    rendered = eventually(
+        lambda: next(
+            (item for item in telegram.sends if f"#{agent}" in item.get("text", "")),
+            None,
         )
     )
+    assert rendered["parse_mode"] == "HTML"
+    assert rendered["text"].startswith("<b>Codex 本轮完成</b>\n项目：example\n#")
+    assert "Completed <b>successfully</b>." in rendered["text"]
+    assert "• Added tests" in rendered["text"]
+    assert not rendered["text"].startswith(f"{agent}:")
     assert all(
         answer not in value
         for record in logs()
@@ -82,26 +91,91 @@ def run(root, tmp, env, topic, api, telegram, eventually, report):
     )
     eventually(
         lambda: any(
-            item.get("text") == f"{agent}:\n{bullet_answer}" for item in telegram.sends
+            item.get("text", "").endswith("• Added tests\n• Updated docs")
+            and f"#{agent}" in item["text"]
+            for item in telegram.sends
         )
     )
 
-    # Astral Unicode must respect Telegram's UTF-16 budget including attribution.
+    # Store the full answer; bound only Telegram's rendered preview.
     long_answer = "🚀" * 3000
     hook(last_assistant_message=long_answer)
     long_receipt = logs()[-1]
-    truncated = next(
+    stored = next(
         m
         for m in api("history", agent=agent, topic=topic)["messages"]
         if m["msg_id"] == long_receipt["msg_id"]
     )["content"]
-    assert truncated.endswith("\n\n… (truncated)")
-    assert truncated.startswith("🚀") and "\ufffd" not in truncated
-    assert len(f"{agent}:\n{truncated}".encode("utf-16-le")) // 2 <= 4096
+    assert stored.endswith(long_answer)
+    preview = eventually(
+        lambda: next(
+            (item for item in telegram.sends if "🚀" in item.get("text", "")),
+            None,
+        )
+    )["text"]
+    assert preview.startswith("<b>Codex 本轮完成</b>\n项目：example\n#")
+    assert preview.endswith("\n\n…（已截断）") and "\ufffd" not in preview
+    assert len(preview.encode("utf-16-le")) // 2 <= 4096
+
+    rich_answer = (
+        "[Docs](https://example.com/?a=1&b=2) and `x < y`\n\n"
+        '```python\nprint("<ok>")\n```\n\n'
+        "**bold `inline`**\n\n> quote\n> > nested\n\n"
+        '<script>alert("unsafe")</script>\n\n[unsafe](javascript:alert)'
+    )
+    hook(last_assistant_message=rich_answer)
+    rich = eventually(
+        lambda: next(
+            (item for item in telegram.sends if "alert" in item.get("text", "")),
+            None,
+        )
+    )["text"]
+    assert '<a href="https://example.com/?a=1&amp;b=2">Docs</a>' in rich
+    assert "<code>x &lt; y</code>" in rich
+    assert (
+        '<pre><code class="language-python">print("&lt;ok&gt;")\n</code></pre>' in rich
+    )
+    assert "<b>bold inline</b>" in rich and "<blockquote>" not in rich
+    assert "&lt;script&gt;" in rich and "<script>" not in rich
+    assert 'href="javascript:' not in rich
+
+    # Linked worktree paths must display the original repository name.
+    repository = tmp / "sample_project"
+    repository.mkdir()
+    subprocess.run(["git", "init", str(repository)], check=True, capture_output=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repository),
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "--allow-empty",
+            "-m",
+            "initial",
+        ],
+        check=True,
+        capture_output=True,
+    )
+    worktree = tmp / "task_branch"
+    subprocess.run(
+        ["git", "-C", str(repository), "worktree", "add", str(worktree)],
+        check=True,
+        capture_output=True,
+    )
+    hook(cwd=str(worktree), last_assistant_message="Worktree identity verified.")
     eventually(
         lambda: any(
-            item.get("text") == f"{agent}:\n{truncated}" for item in telegram.sends
+            "项目：sample_project" in item.get("text", "")
+            and "Worktree identity verified." in item["text"]
+            for item in telegram.sends
         )
+    )
+    checks.append(
+        "rich Markdown, safe HTML, full history with bounded preview, original worktree project"
     )
 
     hook()  # Another process, same Session.
@@ -112,21 +186,18 @@ def run(root, tmp, env, topic, api, telegram, eventually, report):
     hook(event="SubagentStop")
     assert len(logs()) == before
     checks.append(
-        "real CLI delivery, Session persistence/isolation, main Stop only, final answer forwarding without metadata or log disclosure"
+        "real CLI delivery, Session persistence/isolation, main Stop only, final answer forwarding with title/project/tag and no content in logs"
     )
 
     hook(session="")
     assert logs()[-1]["status"] == "failed"
     assert hook(last_assistant_message=None).stderr == ""
     fallback = logs()[-1]
-    assert (
-        next(
-            m
-            for m in api("history", agent=agent, topic=topic)["messages"]
-            if m["msg_id"] == fallback["msg_id"]
-        )["content"]
-        == "Codex turn finished (no final response)."
-    )
+    assert next(
+        m
+        for m in api("history", agent=agent, topic=topic)["messages"]
+        if m["msg_id"] == fallback["msg_id"]
+    )["content"].endswith("Codex turn finished (no final response).")
 
     # Exercise actionable failure diagnostics without disclosing remote response text.
     malformed = subprocess.run(

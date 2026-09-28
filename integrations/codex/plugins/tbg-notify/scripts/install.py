@@ -73,6 +73,17 @@ def resolve_install_config(request):
     )
     if "--request-timeout-ms" not in result.stdout:
         raise ValueError("tbg is too old; install the CLI shipped with this plugin")
+    send_help = subprocess.run(
+        [executable, "send", "--help"],
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=3,
+    )
+    if "--format" not in send_help.stdout or "--no-header" not in send_help.stdout:
+        raise ValueError(
+            "tbg is too old; install a CLI and Gateway with Markdown send support"
+        )
     return NotificationConfig(request.topic, executable)
 
 

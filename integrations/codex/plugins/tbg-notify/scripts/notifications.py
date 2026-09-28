@@ -156,23 +156,44 @@ def restore_or_register_agent(binding_path, config, deadline):
     return agent
 
 
-def fit_notification(content, agent):
-    # Match Gateway's UTF-16 limit, including its "Agent:\n" attribution.
-    budget = 4096 - len(f"{agent}:\n".encode("utf-16-le")) // 2
-    encoded = content.encode("utf-16-le")
-    if len(encoded) // 2 <= budget:
-        return content
-    marker = "\n\n… (truncated)"
-    prefix_budget = budget - len(marker.encode("utf-16-le")) // 2
-    if prefix_budget < 0:
-        raise NotificationError(
-            "format_notification", "Agent header leaves no room for a notification"
+def resolve_project(cwd, deadline):
+    # Git's common directory identifies the original repository for linked worktrees.
+    fallback = Path(cwd).name or "Unknown project"
+    remaining = deadline - time.monotonic()
+    if remaining <= 0.1:
+        return fallback
+    try:
+        result = subprocess.run(
+            [
+                "git",
+                "-C",
+                cwd,
+                "rev-parse",
+                "--show-toplevel",
+                "--path-format=absolute",
+                "--git-common-dir",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=min(0.5, remaining),
         )
-    return encoded[: prefix_budget * 2].decode("utf-16-le", errors="ignore") + marker
+        if result.returncode == 0:
+            top, common = result.stdout.strip().splitlines()
+            common = Path(common)
+            return common.parent.name if common.name == ".git" else Path(top).name
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        pass  # Project display is best effort and must not suppress a notification.
+    return fallback
+
+
+def format_notification(agent, project, content):
+    project = " ".join(project.splitlines())[:120]
+    project = re.sub(r"([\\`*_{}\[\]()#+.!<>|~-])", r"\\\1", project)
+    # Stop events currently expose no session title; use the agreed fallback.
+    return f"**Codex 本轮完成**\n项目：{project}\n#{agent}\n\n{content}"
 
 
 def send_turn_notification(session_id, content, agent, config, deadline):
-    content = fit_notification(content, agent)
     response = _request_gateway(
         config,
         deadline,
@@ -181,6 +202,9 @@ def send_turn_notification(session_id, content, agent, config, deadline):
         agent,
         "send",
         config.topic,
+        "--format",
+        "markdown",
+        "--no-header",
         "--",
         content,
     )
@@ -193,15 +217,19 @@ def send_turn_notification(session_id, content, agent, config, deadline):
     }
 
 
-def deliver_notification(session_id, content):
-    # Sends the final response using the Session's persistent Agent identity.
+def deliver_notification(session_id, content, cwd="."):
+    # Sends a titled Markdown response under the Session's Agent tag.
     config = load_config()
 
     deadline = time.monotonic() + 3
+    project = resolve_project(cwd, deadline)
+
     with lock_session(session_id) as binding_path:
         agent = restore_or_register_agent(binding_path, config, deadline)
 
-        receipt = send_turn_notification(session_id, content, agent, config, deadline)
+        message = format_notification(agent, project, content)
+
+        receipt = send_turn_notification(session_id, message, agent, config, deadline)
 
     record_delivery(receipt)
 

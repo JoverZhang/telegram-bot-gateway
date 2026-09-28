@@ -4,6 +4,16 @@ pub use responses::*;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
+#[derive(Debug, Clone, Copy, clap::ValueEnum, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MessageFormat {
+    Plain,
+    Markdown,
+}
+fn is_false(value: &bool) -> bool {
+    !value
+}
+
 // One command catalogue supplies clap syntax and the server's allowed routes.
 #[derive(Debug, Clone, Subcommand, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
@@ -20,6 +30,13 @@ pub enum Command {
         content: String,
         #[arg(long)]
         quote: Option<String>,
+        /// Render Markdown in Telegram; history retains the original source.
+        #[arg(long, value_enum)]
+        format: Option<MessageFormat>,
+        /// Omit the Telegram Agent header (recorded sender is unchanged).
+        #[arg(long)]
+        #[serde(default, skip_serializing_if = "is_false")]
+        no_header: bool,
     },
     Unread {
         topic: String,

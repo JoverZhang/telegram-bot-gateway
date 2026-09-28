@@ -10,60 +10,104 @@ impl Gateway {
                 | Command::History { .. }
                 | Command::Unread { .. }
         );
-        self.db.run(write, move |tx| {
-            let result = match command {
-                Command::Whoami => Response::Identity { name: agent.clone() },
-                Command::Subscriptions => Response::Subscriptions { subscriptions: tx.subs(&agent)? },
-                Command::Subscribe { topic, muted } => {
-                    tx.subscribe(&agent, &topic, muted)?;
-                    Response::Topic { topic }
-                }
-                Command::Unsubscribe { topic } => {
-                    tx.unsubscribe(&agent, &topic)?;
-                    Response::Topic { topic }
-                }
-                Command::Mute { topic, off } => {
-                    tx.mute(&agent, &topic, !off)?;
-                    Response::Muted { topic, muted: !off }
-                }
-                Command::Ack { topic, through } => {
-                    let through = parse_msg(&through)?;
-                    let (old, _) = tx.sub(&agent, &topic)?;
-                    tx.message_in(&topic, through)?;
-                    let boundary = old.unwrap_or(0).max(through);
-                    if old != Some(boundary) {
-                        let destination = tx.topic(&topic)?;
-                        for (id, _) in tx.pending(&agent, &topic, old)? {
-                            if id > through { break; }
-                            tx.enqueue("reaction", Some(id), destination.chat, Delivery::Heart { target: None })?;
+        self.db
+            .run(write, move |tx| {
+                let result = match command {
+                    Command::Whoami => Response::Identity {
+                        name: agent.clone(),
+                    },
+                    Command::Subscriptions => Response::Subscriptions {
+                        subscriptions: tx.subs(&agent)?,
+                    },
+                    Command::Subscribe { topic, muted } => {
+                        tx.subscribe(&agent, &topic, muted)?;
+                        Response::Topic { topic }
+                    }
+                    Command::Unsubscribe { topic } => {
+                        tx.unsubscribe(&agent, &topic)?;
+                        Response::Topic { topic }
+                    }
+                    Command::Mute { topic, off } => {
+                        tx.mute(&agent, &topic, !off)?;
+                        Response::Muted { topic, muted: !off }
+                    }
+                    Command::Ack { topic, through } => {
+                        let through = parse_msg(&through)?;
+                        let (old, _) = tx.sub(&agent, &topic)?;
+                        tx.message_in(&topic, through)?;
+                        let boundary = old.unwrap_or(0).max(through);
+                        if old != Some(boundary) {
+                            let destination = tx.topic(&topic)?;
+                            for (id, _) in tx.pending(&agent, &topic, old)? {
+                                if id > through {
+                                    break;
+                                }
+                                tx.enqueue(
+                                    "reaction",
+                                    Some(id),
+                                    destination.chat,
+                                    Delivery::Heart { target: None },
+                                )?;
+                            }
+                            tx.set_ack(&agent, &topic, boundary)?;
                         }
-                        tx.set_ack(&agent, &topic, boundary)?;
+                        Response::Ack {
+                            last_acked_msg_id: msg_id(boundary),
+                        }
                     }
-                    Response::Ack { last_acked_msg_id: msg_id(boundary) }
-                }
-                Command::Unread { topic, cursor, limit } => Self::read(tx, &agent, &topic, cursor, limit, true)?,
-                Command::History { topic, cursor, limit } => Self::read(tx, &agent, &topic, cursor, limit, false)?,
-                Command::Send { topic, content, quote } => {
-                    let destination = tx.topic(&topic)?;
-                    if destination.closed || !destination.available { return Err(Error::conflict("Topic is closed or Group is unavailable")); }
-                    let text = crate::bot::conversation(&agent, &content);
-                    if content.is_empty() || text.encode_utf16().count() > 4096 {
-                        return Err(Error::bad("message must be nonempty and fit Telegram's 4096 UTF-16 unit limit including the Agent header"));
+                    Command::Unread {
+                        topic,
+                        cursor,
+                        limit,
+                    } => Self::read(tx, &agent, &topic, cursor, limit, true)?,
+                    Command::History {
+                        topic,
+                        cursor,
+                        limit,
+                    } => Self::read(tx, &agent, &topic, cursor, limit, false)?,
+                    Command::Send {
+                        topic,
+                        content,
+                        quote,
+                        format,
+                        no_header,
+                    } => {
+                        let destination = tx.topic(&topic)?;
+                        if destination.closed || !destination.available {
+                            return Err(Error::conflict("Topic is closed or Group is unavailable"));
+                        }
+                        let (text, parse_mode) = crate::telegram::formatting::message(
+                            &agent, &content, format, no_header,
+                        )?;
+                        let quote = if let Some(quote) = quote {
+                            let id = parse_msg(&quote)?;
+                            tx.message_in(&topic, id)?;
+                            Some(id)
+                        } else {
+                            None
+                        };
+                        let id = tx.append(&topic, Some(&agent), None, &content, now(), quote)?;
+                        tx.enqueue(
+                            "send",
+                            Some(id),
+                            destination.chat,
+                            Delivery::Send {
+                                text,
+                                parse_mode,
+                                thread: Some(destination.thread),
+                                quote: None,
+                            },
+                        )?;
+                        Response::Sent { msg_id: msg_id(id) }
                     }
-                    let quote = if let Some(quote) = quote {
-                        let id = parse_msg(&quote)?;
-                        tx.message_in(&topic, id)?;
-                        Some(id)
-                    } else { None };
-                    let id = tx.append(&topic, Some(&agent), None, &content, now(), quote)?;
-                    tx.enqueue("send", Some(id), destination.chat, Delivery::Send { text, thread: Some(destination.thread), quote: None })?;
-                    Response::Sent { msg_id: msg_id(id) }
+                    _ => return Err(Error::bad("unsupported communication command")),
+                };
+                if write {
+                    tx.audit("agent operation", json!({"agent":agent,"result":result}))?;
                 }
-                _ => return Err(Error::bad("unsupported communication command")),
-            };
-            if write { tx.audit("agent operation", json!({"agent":agent,"result":result}))?; }
-            Ok(result)
-        }).await
+                Ok(result)
+            })
+            .await
     }
     fn read(
         tx: &crate::db::Tx<'_>,

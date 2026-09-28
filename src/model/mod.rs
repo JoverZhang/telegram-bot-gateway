@@ -89,6 +89,8 @@ pub struct Job {
 pub enum Delivery {
     Send {
         text: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        parse_mode: Option<String>,
         thread: Option<i64>,
         quote: Option<i64>,
     },

@@ -33,6 +33,7 @@ TOPIC
 
 COMMUNICATION
   send <topic> "<content>" [--quote <msg_id>]
+       [--format plain|markdown] [--no-header]
                                          发送消息；--quote 引用回复，正文支持 @
   unread <topic> [--cursor <msg_id>] [--limit <n>]
                                          从消费边界（最后一次 ack 的位置）之后顺序读取，可用 cursor 继续
