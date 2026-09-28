@@ -28,6 +28,7 @@ impl std::error::Error for ClientError {}
 pub struct GatewayClient {
     http: reqwest::Client,
     endpoint: String,
+    request_timeout: Option<std::time::Duration>,
 }
 impl GatewayClient {
     pub fn new(endpoint: String) -> std::result::Result<Self, String> {
@@ -37,13 +38,20 @@ impl GatewayClient {
                 .build()
                 .map_err(|e| e.to_string())?,
             endpoint,
+            request_timeout: None,
         })
+    }
+    pub fn with_request_timeout(mut self, timeout: Option<std::time::Duration>) -> Self {
+        self.request_timeout = timeout;
+        self
     }
     pub async fn execute(&self, request: &Request) -> std::result::Result<Response, ClientError> {
         let (route, body) = request.wire();
         let url = format!("{}/v1/{route}", self.endpoint);
         let mut req = self.http.post(&url).json(&body);
-        if route != "wait" {
+        if let Some(timeout) = self.request_timeout {
+            req = req.timeout(timeout);
+        } else if route != "wait" {
             req = req.timeout(std::time::Duration::from_secs(40))
         }
         let r = req.send().await.map_err(|error| ClientError::Transport {

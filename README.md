@@ -58,6 +58,10 @@ Outbound text that exceeds 4096 UTF-16 units including the Agent header is rejec
 
 ## Task-completion notifications
 
+Use the [installable Codex plugin](integrations/codex/README.md) for main-session turn notifications, persistent Session identities and installation/status/test/uninstall commands. It preserves existing Hooks during a trial.
+
+The legacy argv hook below remains available for existing callers.
+
 The hook is an external CLI caller. Supply a registered Agent, an existing Topic and the notification JSON; put `tbg` on its PATH. It needs Python 3 and forwards `last-assistant-message` for `agent-turn-complete` events. It does not retry ambiguous sends. Notification errors are reported to stderr but do not fail the originating task.
 
 ```sh

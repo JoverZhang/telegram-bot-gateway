@@ -1,0 +1,20 @@
+{
+  "name": "tbg-codex",
+  "interface": {
+    "displayName": "Tbg Codex"
+  },
+  "plugins": [
+    {
+      "name": "tbg-notify",
+      "source": {
+        "source": "local",
+        "path": "./plugins/tbg-notify"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

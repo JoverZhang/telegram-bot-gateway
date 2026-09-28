@@ -1,0 +1,17 @@
+{
+  "name": "tbg-notify",
+  "version": "0.1.0",
+  "description": "Send Codex turn completion notifications through Telegram Bot Gateway.",
+  "author": {
+    "name": "Telegram Bot Gateway contributors"
+  },
+  "interface": {
+    "displayName": "TBG Notifications",
+    "shortDescription": "Codex turn notifications through Telegram.",
+    "longDescription": "Send a short notification to a configured Topic when a Codex turn finishes. Requires the tbg CLI and a running Gateway.",
+    "developerName": "Telegram Bot Gateway contributors",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": "Help me configure Codex notifications through Telegram Bot Gateway."
+  }
+}

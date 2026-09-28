@@ -670,6 +670,8 @@ def main():
             results.append(
                 "empty startup polls preserve reset offset; slash-prefixed conversation is retained"
             )
+            from codex_plugin_e2e import run as verify_codex_plugin
+            results.extend(verify_codex_plugin(ROOT, tmp, env, topic, api, Telegram, eventually, REPORT))
         finally:
             stop()
             stub.shutdown()
