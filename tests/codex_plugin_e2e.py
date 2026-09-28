@@ -68,7 +68,12 @@ def run(root, tmp, env, topic, api, telegram, eventually, report):
             item.get("text") == f"{agent}:\n{answer}" for item in telegram.sends
         )
     )
-    assert answer not in (state / "notifications.jsonl").read_text()
+    assert all(
+        answer not in value
+        for record in logs()
+        for value in record.values()
+        if isinstance(value, str)
+    )
     bullet_answer = "- Added tests\n- Updated docs"
     hook(last_assistant_message=bullet_answer)
     bullet_receipt = logs()[-1]
