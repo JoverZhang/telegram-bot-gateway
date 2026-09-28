@@ -27,6 +27,7 @@ pub enum Command {
     Topic(Topic),
     Send {
         topic: String,
+        /// Message text, or - to read UTF-8 content from stdin (CLI only).
         content: String,
         #[arg(long)]
         quote: Option<String>,

@@ -98,7 +98,7 @@ def run(root, tmp, env, topic, api, telegram, eventually, report):
     )
 
     # Store the full answer; bound only Telegram's rendered preview.
-    long_answer = "🚀" * 3000
+    long_answer = "🚀" * 40000  # Exceeds Linux's per-argument size limit; use stdin.
     hook(last_assistant_message=long_answer)
     long_receipt = logs()[-1]
     stored = next(

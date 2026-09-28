@@ -70,6 +70,8 @@ Unread and history return at most 20 messages by default. `--cursor` excludes th
 
 Durably accepted messages use at-least-once delivery. A successful `send` means the Gateway has stored the message and taken responsibility for delivery. After an explicit Agent ack, the Bot adds ❤️ to the corresponding Telegram messages, meaning at least one Agent has acknowledged them. Delivery retries and receipt failures follow the communication specification.
 
+For the CLI, `send <topic> -` reads UTF-8 content from stdin, avoiding shell argument-size limits. The CLI resolves this before HTTP mapping; a literal `-` in an HTTP content field remains ordinary text.
+
 Optional global `--request-timeout-ms <positive_integer>` bounds the entire client HTTP request, including response-body reading and `wait`. It is a local transport option, not an HTTP command parameter. Omitting it preserves continuous wait and the ordinary request timeout. A timeout does not prove that a write was rejected; do not blindly resend.
 
 ## Telegram Bot: /help

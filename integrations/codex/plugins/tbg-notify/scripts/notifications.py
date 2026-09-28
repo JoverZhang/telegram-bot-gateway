@@ -68,7 +68,7 @@ def _save_private_json(path, value, step):
         ) from error
 
 
-def _request_gateway(config, deadline, step, *args):
+def _request_gateway(config, deadline, step, *args, input_text=None):
     remaining = deadline - time.monotonic()
     if remaining <= 0.1:
         raise NotificationError(step, "notification deadline exceeded")
@@ -80,6 +80,7 @@ def _request_gateway(config, deadline, step, *args):
                 str(max(1, int((remaining - 0.05) * 1000))),
                 *args,
             ],
+            input=input_text,
             capture_output=True,
             text=True,
             timeout=remaining,
@@ -211,7 +212,8 @@ def send_turn_notification(session_id, content, agent, config, deadline):
         "markdown",
         "--no-header",
         "--",
-        content,
+        "-",
+        input_text=content,
     )
     return {
         "session_id": session_id,

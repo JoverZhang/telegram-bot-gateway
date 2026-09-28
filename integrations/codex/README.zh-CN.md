@@ -48,7 +48,7 @@ Stop → 持久化的 Session/Agent 绑定 → tbg send → Gateway 持久化投
 
 正文取自 Stop 事件的 `last_assistant_message`。Stop 当前不提供会话标题，因此标题使用 `Codex 本轮完成`。项目名取 Git 原仓库名，linked worktree 也能识别；Git 查询失败时使用工作目录名。Session 的 Agent 以 hashtag 显示，不再重复添加 Agent 标头。最终回答缺失、为 null 或空白时，发送 `Codex turn finished (no final response).`。
 
-插件使用 `send --format markdown --no-header`，将最终回答包在 fenced code block 中。正文中的 Markdown 符号、列表和代码围栏都原样显示，仅标题加粗。外层围栏长于正文中所有连续反引号，避免正文中的代码块提前结束外层代码块。Gateway 将外层格式转为安全的 Telegram HTML，并转义正文。历史记录保存完整通知原文；Telegram 展示副本超长时，仅截断展示内容，在代码块外标记 `…（已截断）`，保留标题、项目和标签。长度保守地按 HTML 源码的 UTF-16 单元计算，转义较多时可能提早截断。普通纯文本发送仍拒绝超长消息。
+插件通过 stdin 传入通知，使用 `send <topic> - --format markdown --no-header`，将最终回答包在 fenced code block 中。正文中的 Markdown 符号、列表和代码围栏都原样显示，仅标题加粗。外层围栏长于正文中所有连续反引号，避免正文中的代码块提前结束外层代码块。Gateway 将外层格式转为安全的 Telegram HTML，并转义正文。历史记录保存完整通知原文；Telegram 展示副本超长时，仅截断展示内容，在代码块外标记 `…（已截断）`，保留标题、项目和标签。长度保守地按 HTML 源码的 UTF-16 单元计算，转义较多时可能提早截断。普通纯文本发送仍拒绝超长消息。
 
 一次 Stop 调用发送一条通知；重放事件可能重复发送。注册结果不明确时可能遗留未使用的 Agent。不承诺恰好一次，不自动重试发送，也没有本地离线队列。
 

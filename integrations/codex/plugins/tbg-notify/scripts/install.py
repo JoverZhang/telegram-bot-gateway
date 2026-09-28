@@ -80,9 +80,12 @@ def resolve_install_config(request):
         check=True,
         timeout=3,
     )
-    if "--format" not in send_help.stdout or "--no-header" not in send_help.stdout:
+    if any(
+        option not in send_help.stdout
+        for option in ("--format", "--no-header", "stdin")
+    ):
         raise ValueError(
-            "tbg is too old; install a CLI and Gateway with Markdown send support"
+            "tbg is too old; install a CLI and Gateway with Markdown send and stdin support"
         )
     return NotificationConfig(request.topic, executable)
 

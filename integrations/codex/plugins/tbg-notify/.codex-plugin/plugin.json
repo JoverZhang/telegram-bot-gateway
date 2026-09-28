@@ -1,6 +1,6 @@
 {
   "name": "tbg-notify",
-  "version": "0.1.0+codex.20260928102149",
+  "version": "0.1.0+codex.20260928102506",
   "description": "Send Codex turn completion notifications through Telegram Bot Gateway.",
   "author": {
     "name": "Telegram Bot Gateway contributors"
