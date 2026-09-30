@@ -1,3 +1,4 @@
+mod buttons;
 mod communication;
 mod delivery;
 mod ingest;
@@ -20,6 +21,8 @@ pub(crate) struct Gateway {
     pub telegram: TelegramClient,
     pub admins: Arc<Vec<i64>>,
     waits: Arc<Mutex<HashSet<String>>>,
+    edits: Arc<tokio::sync::Mutex<()>>,
+    telegram_ready: Arc<std::sync::atomic::AtomicBool>,
 }
 impl Gateway {
     pub fn new(db: Database, telegram: TelegramClient, admins: Vec<i64>) -> Self {
@@ -28,6 +31,8 @@ impl Gateway {
             telegram,
             admins: Arc::new(admins),
             waits: Default::default(),
+            edits: Default::default(),
+            telegram_ready: Default::default(),
         }
     }
     pub async fn execute(
@@ -58,6 +63,9 @@ impl Gateway {
         self.db.run(false, move |tx| tx.require_agent(&a)).await?;
         let actor = agent.clone();
         let result = match request.command {
+            command @ (Command::Edit(_) | Command::Callback(_)) => {
+                self.buttons(command, agent).await
+            }
             Command::Wait { topic, timeout } => self.wait(agent, topic, timeout, cancel).await,
             command @ (Command::Topic(_) | Command::Agent(_) | Command::Group(_)) => {
                 self.manage(command, agent).await

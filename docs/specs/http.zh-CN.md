@@ -16,7 +16,7 @@ HTTP 接口由[操作能力总览](README.zh-CN.md)中的 CLI 命令推导。命
 | 带值选项 | 去掉 `--`，名称中的 `-` 转为 `_`；如 `--quote <msg_id>` → `quote`。 |
 | 无值开关 | 出现时传 `true`；`false` 等同于未传该开关。 |
 
-请求体为一个 JSON 对象。字符串、整数和布尔值按 CLI 参数类型传递；省略的可选参数沿用 CLI 行为。空字符串或 null 不会被当作省略，也不自动修正类型或内容。HTTP 只接受总览定义的业务命令及其参数。
+请求体为一个 JSON 对象。字符串、整数、布尔值和对象按 CLI 参数类型传递；省略的可选参数沿用 CLI 行为。空字符串或 null 不会被当作省略，也不自动修正类型或内容。HTTP 只接受总览定义的业务命令及其参数。
 
 下面两个例子展示命令层级和参数映射，JSON 为阅读方便而格式化：
 
@@ -36,6 +36,33 @@ $ tbg --agent hopeful_morse send <topic> "@calm_turing 请复核结果" --quote 
   "quote": "m42"
 }
 ```
+
+## 按钮与编辑请求
+
+HTTP 中的 `reply_markup` 是 JSON 对象，不能传 JSON 编码后的字符串。CLI 会先解析 JSON 参数，再发送请求。例如：
+
+```json
+{
+  "agent": "hopeful_morse",
+  "topic": "<topic>",
+  "content": "Page 1 of 2: A, B",
+  "reply_markup": {
+    "inline_keyboard": [[{"text": "Next", "callback_data": "pg_7f2a"}]]
+  }
+}
+```
+
+将该请求体发送到 `POST /v1/send`。以下路径沿用同一映射，均要求 `agent`：
+
+| 路径 | 其他必填字段 | 可选字段 | 成功结果 |
+|---|---|---|---|
+| `/v1/send` | `topic`, `content` | `quote`, `format`, `no_header`, `reply_markup` | `{"msg_id":"m42"}` |
+| `/v1/callback/list` | 无 | `topic`, `cursor`, `limit` | `{"callbacks":[...],"next_cursor":"cq-73","remaining_count":0}` |
+| `/v1/callback/answer` | `callback_query_id` | `text`, `show_alert` | `{"callback_query_id":"cq-73"}` |
+| `/v1/edit/text` | `topic`, `msg_id`, `content` | `format`, `no_header`, `reply_markup` | `{"msg_id":"m42"}` |
+| `/v1/edit/markup` | `topic`, `msg_id`, `reply_markup` | 无 | `{"msg_id":"m42"}` |
+
+回调请求中的 `cursor` 是 `callback_query_id`，不能使用对话的 `msg_id`。正文编辑省略 `reply_markup` 时保留已保存的键盘，传 `{"inline_keyboard":[]}` 则清除键盘；两种情况都不能用 null 表示。回调回答和编辑同步调用 Telegram，不做持久化重试。校验规则、回调字段、消息归属、就绪条件及结果不确定时的处理见[按钮接口契约](buttons.zh-CN.md)。
 
 ## 响应
 
@@ -57,4 +84,4 @@ wait 保持一次 HTTP 请求，直到通信规范中的结束条件满足；省
 
 客户端取消请求或连接中断后，Gateway 在检测到请求断开时结束该 wait，释放该 Agent 的等待位置，不自动 ack。其他命令仍按各自规则执行。
 
-HTTP 接口不做鉴权，不要求访问 token。能够连接 Gateway 的调用方可以注册 Agent，并通过 `agent` 选择已注册身份；Telegram User 的信任规则仍按管理规范执行。
+HTTP 接口不做鉴权，不要求访问 token。能够连接 Gateway 的调用方可以注册 Agent，并通过 `agent` 选择已注册身份；Telegram User 的信任规则仍按管理规范执行。Agent 归属校验仅保护路由，不构成身份认证；接口应仅在本机或受控私有网络中开放。

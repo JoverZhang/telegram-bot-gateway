@@ -58,6 +58,14 @@ pub enum Response {
     Sent {
         msg_id: String,
     },
+    CallbackPage {
+        callbacks: Vec<super::CallbackQuery>,
+        next_cursor: Option<String>,
+        remaining_count: i64,
+    },
+    CallbackAnswered {
+        callback_query_id: String,
+    },
     Page {
         messages: Vec<Message>,
         next_cursor: Option<String>,

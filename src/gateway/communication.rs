@@ -71,6 +71,7 @@ impl Gateway {
                         quote,
                         format,
                         no_header,
+                        reply_markup,
                     } => {
                         let destination = tx.topic(&topic)?;
                         if destination.closed || !destination.available {
@@ -87,6 +88,9 @@ impl Gateway {
                             None
                         };
                         let id = tx.append(&topic, Some(&agent), None, &content, now(), quote)?;
+                        if let Some(markup) = &reply_markup {
+                            tx.save_keyboard(id, markup)?;
+                        }
                         tx.enqueue(
                             "send",
                             Some(id),
@@ -94,6 +98,7 @@ impl Gateway {
                             Delivery::Send {
                                 text,
                                 parse_mode,
+                                reply_markup,
                                 thread: Some(destination.thread),
                                 quote: None,
                             },

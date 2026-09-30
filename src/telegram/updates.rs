@@ -14,7 +14,15 @@ pub(crate) enum Event {
         present: bool,
     },
     Message(Message),
+    Callback(Callback),
     Other,
+}
+pub(crate) struct Callback {
+    pub id: String,
+    pub user: i64,
+    pub chat: i64,
+    pub message: i64,
+    pub data: String,
 }
 pub(crate) struct Message {
     pub id: i64,
@@ -48,6 +56,33 @@ impl Update {
                     member["new_chat_member"]["status"].as_str(),
                     Some("left" | "kicked")
                 ),
+            }
+        } else if let Some(callback) = value.get("callback_query") {
+            // Inline-mode/game callbacks have no Gateway message target. Ignore malformed
+            // callbacks rather than blocking the complete polling batch on one update.
+            match (
+                callback["id"].as_str(),
+                callback["from"]["id"].as_i64(),
+                callback["message"]["chat"]["id"].as_i64(),
+                callback["message"]["message_id"].as_i64(),
+                callback["data"].as_str(),
+            ) {
+                (Some(id), Some(user), Some(chat), Some(message), Some(data))
+                    if !id.is_empty()
+                        && (1..=64).contains(&data.len())
+                        && callback["from"]["is_bot"] != true
+                        && callback.get("inline_message_id").is_none()
+                        && callback.get("game_short_name").is_none() =>
+                {
+                    Event::Callback(Callback {
+                        id: id.into(),
+                        user,
+                        chat,
+                        message,
+                        data: data.into(),
+                    })
+                }
+                _ => Event::Other,
             }
         } else if let Some(message) = value.get("message") {
             // Anonymous administrator/channel messages have no attributable User actor.
@@ -140,6 +175,14 @@ impl Update {
                 }
             }
         }
+        if let Event::Callback(callback) = &event {
+            // Callback messages may embed unrelated replies, quotes, or personal fields.
+            // Keep only the fields the application contract actually needs.
+            value = json!({"update_id":id,"callback_query":{
+                "id":callback.id,"from":{"id":callback.user},"data":callback.data,
+                "message":{"message_id":callback.message,"chat":{"id":callback.chat}}
+            }});
+        }
         Ok(Self {
             id,
             raw: value.to_string(),
@@ -154,7 +197,8 @@ fn required_id(value: &Value, key: &str) -> Result<i64, Failure> {
 }
 impl TelegramClient {
     pub async fn updates(&self, offset: Option<i64>) -> Result<Vec<Update>, Failure> {
-        let mut body = json!({"timeout":25,"allowed_updates":["message","my_chat_member"]});
+        let mut body =
+            json!({"timeout":25,"allowed_updates":["message","my_chat_member","callback_query"]});
         if let Some(offset) = offset {
             body["offset"] = json!(offset);
         }

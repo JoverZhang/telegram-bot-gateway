@@ -34,7 +34,7 @@ impl Gateway {
                                 user: message.user, admin, trusted, initialized: !admins.is_empty(),
                                 group: message.group, topic: message.thread, zh: message.language.starts_with("zh"),
                             });
-                            tx.enqueue("management", None, message.chat, Delivery::Send { text, parse_mode: None, thread: message.thread, quote: None })?;
+                            tx.enqueue("management", None, message.chat, Delivery::Send { text, parse_mode: None, reply_markup: None, thread: message.thread, quote: None })?;
                         }
                     } else if tx.connected(message.chat)? && let Some(thread) = message.thread.filter(|thread| *thread != 1) {
                         if let Some(event) = message.topic_event {
@@ -54,6 +54,12 @@ impl Gateway {
                             tx.map(message.chat, message.id, id)?;
                             tx.save_raw_update(update.id, &update.raw)?;
                         }
+                    }
+                }
+                Event::Callback(callback) => {
+                    if (admins.contains(&callback.user) || tx.trusted(callback.user)?)
+                        && tx.record_callback(&callback)? {
+                        tx.save_raw_update(update.id, &update.raw)?;
                     }
                 }
                 Event::Other => (),

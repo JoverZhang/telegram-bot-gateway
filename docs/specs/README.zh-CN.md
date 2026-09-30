@@ -33,7 +33,7 @@ TOPIC
 
 COMMUNICATION
   send <topic> "<content>" [--quote <msg_id>]
-       [--format plain|markdown] [--no-header]
+       [--format plain|markdown] [--no-header] [--reply-markup <JSON>]
                                          发送消息；--quote 引用回复，正文支持 @
   unread <topic> [--cursor <msg_id>] [--limit <n>]
                                          从消费边界（最后一次 ack 的位置）之后顺序读取，可用 cursor 继续
@@ -43,6 +43,17 @@ COMMUNICATION
                                          从最新消息倒序回看，可用 cursor 继续
   wait [--topic <topic>] [--timeout <seconds>]
                                          默认持续等待所有当前订阅，每个 Agent 只允许一个 wait
+
+BUTTONS AND EDITS
+  callback list [--topic <topic>] [--cursor <callback_query_id>] [--limit <n>]
+                                         按接收顺序读取自己消息的回调，不使用对话 ack
+  callback answer <callback_query_id> [--text "<text>"] [--show-alert]
+                                         及时回答点击，结束 Telegram 加载提示
+  edit text <topic> <msg_id> "<content>"
+       [--format plain|markdown] [--no-header] [--reply-markup <JSON>]
+                                         编辑自己已投递的消息；省略 markup 时保留键盘
+  edit markup <topic> <msg_id> --reply-markup <JSON>
+                                         替换键盘；{"inline_keyboard":[]} 清除键盘
 
 SUBSCRIPTION
   subscribe <topic> [--muted]             订阅新消息，或恢复已有订阅及原进度
@@ -69,6 +80,8 @@ Topic 是共享对话空间。Reply 保留回应关系，@ 表达希望谁关注
 unread 和 history 默认最多返回 20 条，`--cursor` 排除指定消息，沿命令的读取方向继续。每条消息包含 `msg_id`、发送时间、发送者及完整正文。Agent 应先读完后续对话再回应，并显式 ack 已处理的消息；读取和发送都不自动确认。消息字段、分页返回、订阅恢复及 wait 场景见[通信规范](communication.zh-CN.md)。
 
 已持久接收的消息按至少一次投递；`send` 成功表示 Gateway 已保存消息并负责投递。Agent 显式 ack 后，Bot 为相应 Telegram 消息添加 ❤️，表示至少一个 Agent 已确认。投递重试及回执失败的行为见通信规范。
+
+内联键盘、回调轮询和消息编辑遵循[按钮接口契约](buttons.zh-CN.md)。应用须独立轮询回调，处理后自行保存游标。回调回答与编辑同步调用 Telegram，没有持久化重试队列；send 保持既有持久化投递语义。所有按钮命令都要求 `--agent`。
 
 CLI 的 `send <topic> -` 从 stdin 读取 UTF-8 正文，避免命令行参数长度限制。CLI 在映射 HTTP 请求前完成读取；HTTP 正文字段中的 `-` 仍是普通文字。
 
@@ -123,6 +136,7 @@ Gateway 管理员将 Bot 拉进 Group 后，网关自动登记。其他 User 邀
 | 文件 | 职责 |
 |---|---|
 | [communication.zh-CN.md](communication.zh-CN.md) | Agent CLI 与 Telegram User 的通信场景：订阅、发送、读取、ack、wait、Reply/@、暂离与恢复。 |
+| [buttons.zh-CN.md](buttons.zh-CN.md) | Agent 内联键盘、回调读取与回答、消息编辑、授权边界及应用翻页。 |
 | [operations.zh-CN.md](operations.zh-CN.md) | 注册与身份、Client/Server 配置、User 信任、Group/Topic 管理、菜单交互、Doctor、状态及语言设置。 |
 | [http.zh-CN.md](http.zh-CN.md) | 从 CLI 推导 HTTP 请求、参数、响应和 wait 的通用映射。 |
 

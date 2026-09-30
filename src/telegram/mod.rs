@@ -1,7 +1,7 @@
 pub(crate) mod formatting;
 mod updates;
 use serde_json::{Value, json};
-pub(crate) use updates::{Event, TopicEvent, Update};
+pub(crate) use updates::{Callback, Event, TopicEvent, Update};
 #[derive(Clone)]
 pub(crate) struct TelegramClient {
     http: reqwest::Client,
@@ -99,6 +99,47 @@ impl TelegramClient {
         .await?;
         Ok(())
     }
+    pub async fn edit(&self, method: &str, payload: Value) -> Result<(), Failure> {
+        let chat = payload["chat_id"].as_i64();
+        let message = payload["message_id"].as_i64();
+        match self.call(method, payload).await {
+            Ok(result)
+                if result["message_id"].as_i64() == message
+                    && result["chat"]["id"].as_i64() == chat =>
+            {
+                Ok(())
+            }
+            Ok(_) => Err(Failure::invalid("invalid edited message; outcome unknown")),
+            // An exact retry after a lost response reconciles local history/markup.
+            Err(error)
+                if error.code == 400
+                    && error
+                        .detail
+                        .to_ascii_lowercase()
+                        .contains("message is not modified") =>
+            {
+                Ok(())
+            }
+            Err(error) => Err(error),
+        }
+    }
+    pub async fn answer_callback(
+        &self,
+        query: &str,
+        text: Option<String>,
+        show_alert: bool,
+    ) -> Result<(), Failure> {
+        let mut payload = json!({"callback_query_id":query,"show_alert":show_alert});
+        if let Some(text) = text {
+            payload["text"] = json!(text);
+        }
+        if self.call("answerCallbackQuery", payload).await? != true {
+            return Err(Failure::invalid(
+                "invalid callback answer response; outcome unknown",
+            ));
+        }
+        Ok(())
+    }
     pub async fn deliver(
         &self,
         chat: i64,
@@ -109,6 +150,7 @@ impl TelegramClient {
             Delivery::Send {
                 text,
                 parse_mode,
+                reply_markup,
                 thread,
                 quote,
             } => {
@@ -121,6 +163,9 @@ impl TelegramClient {
                 }
                 if let Some(quote) = quote {
                     payload["reply_parameters"] = json!({"message_id":quote});
+                }
+                if let Some(markup) = reply_markup {
+                    payload["reply_markup"] = json!(markup);
                 }
                 let result = self.call("sendMessage", payload).await?;
                 result["message_id"].as_i64().map(Some).ok_or_else(|| {

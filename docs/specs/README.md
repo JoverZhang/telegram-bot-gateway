@@ -33,7 +33,7 @@ TOPIC
 
 COMMUNICATION
   send <topic> "<content>" [--quote <msg_id>]
-       [--format plain|markdown] [--no-header]
+       [--format plain|markdown] [--no-header] [--reply-markup <JSON>]
                                          Send a message; --quote replies to a message; the body supports @
   unread <topic> [--cursor <msg_id>] [--limit <n>]
                                          Read forward after the consumption boundary (last ack position); use cursor to continue
@@ -43,6 +43,17 @@ COMMUNICATION
                                          Read backward from the latest message; use cursor to continue
   wait [--topic <topic>] [--timeout <seconds>]
                                          Wait indefinitely across current subscriptions; one wait per Agent
+
+BUTTONS AND EDITS
+  callback list [--topic <topic>] [--cursor <callback_query_id>] [--limit <n>]
+                                         Read your message callbacks in receive order; no conversation ack
+  callback answer <callback_query_id> [--text "<text>"] [--show-alert]
+                                         Answer a press promptly to end Telegram's loading indicator
+  edit text <topic> <msg_id> "<content>"
+       [--format plain|markdown] [--no-header] [--reply-markup <JSON>]
+                                         Edit your delivered message; omitted markup preserves its keyboard
+  edit markup <topic> <msg_id> --reply-markup <JSON>
+                                         Replace the keyboard; {"inline_keyboard":[]} clears it
 
 SUBSCRIPTION
   subscribe <topic> [--muted]             Subscribe to new messages, or resume existing progress
@@ -69,6 +80,8 @@ A Topic is a shared conversation space. Reply preserves the relationship between
 Unread and history return at most 20 messages by default. `--cursor` excludes the specified message and continues in the command's reading direction. Each message includes its `msg_id`, sending time, sender, and full content. Agents should read the subsequent conversation before responding and explicitly acknowledge messages they have processed; reading and sending never acknowledge automatically. See the [communication specification](communication.md) for message fields, pagination responses, subscription resumption, and wait scenarios.
 
 Durably accepted messages use at-least-once delivery. A successful `send` means the Gateway has stored the message and taken responsibility for delivery. After an explicit Agent ack, the Bot adds ❤️ to the corresponding Telegram messages, meaning at least one Agent has acknowledged them. Delivery retries and receipt failures follow the communication specification.
+
+Inline keyboards, callback polling and message editing follow the [button contract](buttons.md). The application must poll callbacks separately and save its cursor after processing. Callback answers and edits call Telegram synchronously without a durable retry queue; only send keeps the existing durable delivery semantics. All button commands require `--agent`.
 
 For the CLI, `send <topic> -` reads UTF-8 content from stdin, avoiding shell argument-size limits. The CLI resolves this before HTTP mapping; a literal `-` in an HTTP content field remains ordinary text.
 
@@ -123,6 +136,7 @@ Language settings are stored per User. They follow the User's Telegram language 
 | File | Responsibility |
 |---|---|
 | [communication.md](communication.md) | Communication scenarios for the Agent CLI and Telegram Users: subscriptions, sending, reading, ack, wait, Reply/@, leaving temporarily, and resuming. |
+| [buttons.md](buttons.md) | Agent inline keyboards, callback polling/answers, message editing, authorization boundaries, and application pagination. |
 | [operations.md](operations.md) | Registration and identity, Client/Server configuration, User trust, Group/Topic management, menu interactions, Doctor, status, and language settings. |
 | [http.md](http.md) | Shared rules deriving HTTP requests, parameters, responses, and wait from the CLI. |
 

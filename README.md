@@ -4,7 +4,7 @@
 
 A persistent Telegram Topic gateway for Agents. `tbg` sends and reads through HTTP; the Gateway retains conversation, independent subscriptions and acknowledgements in SQLite. A User participates through Telegram.
 
-The first end-to-end flow is implemented: administrator initialization, Group connection, Agent registration, Topic creation/closure/reopening, send, subscriptions, unread/history, wait, ack and Bot ❤️ receipts. `/manage` currently connects a Group and reports its scope. Full button menus, ordinary User trust management, Doctor views and saved language preferences remain planned. For now, configure participating Users as administrators; do not edit the database to grant trust.
+The first end-to-end flow is implemented: administrator initialization, Group connection, Agent registration, Topic creation/closure/reopening, send, subscriptions, unread/history, wait, ack and Bot ❤️ receipts. `/manage` currently connects a Group and reports its scope. Full management button menus, ordinary User trust management, Doctor views and saved language preferences remain planned. For now, configure participating Users as administrators; do not edit the database to grant trust.
 
 ## Run on a Linux PC
 
@@ -56,6 +56,12 @@ Send success means the message and delivery task are committed locally. Delivery
 
 Outbound text that exceeds 4096 UTF-16 units including the Agent header is rejected before acceptance. Non-text Telegram messages retain a `[type]` marker, any caption and the accepted update payload (embedded replies retain only platform references); attachment download is not implemented. The general/default Topic is reserved. Other Users' ordinary messages are ignored unless trusted; permitted management exchanges are retained separately from conversation.
 
+For application buttons, see the [inline-keyboard and edit contract](docs/specs/buttons.md). It covers `send --reply-markup`, separate callback polling and answers, and edits to an Agent's own delivered messages. Page content is shared in the Topic; applications must validate the clicking user and session.
+
+### Upgrade the database for buttons
+
+The button release upgrades SQLite schema 1 to schema 2 at startup by adding keyboard and callback tables. Back up the complete stopped data directory before restarting with the new binary or image. Existing conversation, delivery, and ack state is retained. Once upgraded, the database requires a schema-2-capable Gateway; the older binary rejects it. Rollback requires restoring the pre-upgrade backup and loses later writes.
+
 ## Task-completion notifications
 
 Use the [installable Codex plugin](integrations/codex/README.md) for main-session turn notifications, persistent Session identities and installation/status/test/uninstall commands. It preserves existing Hooks during a trial.
@@ -78,10 +84,13 @@ cargo fmt --check
 cargo clippy --locked --all-targets --features test-support -- -D warnings
 cargo build --locked --features test-support
 python3 tests/e2e.py
+python3 tests/buttons_e2e.py
 docker build -t telegram-bot-gateway .
 python3 tests/container_smoke.py --image telegram-bot-gateway
 ```
 
 The E2E suite runs actual CLI/Gateway processes, HTTP and SQLite against a controllable Telegram HTTP server. It covers independent consumption, cursors, mention/mute rules, wait cancellation, admission, restart recovery, 429 responses, lost send responses and rejected receipts. `target/e2e/` contains the report, logs and test database. These are simulated integration results, not a live Telegram check. The `test-support` feature enables isolated configuration/API overrides only for tests; container builds omit it.
+
+The button E2E command writes its report, logs, and database to `target/buttons-e2e/`. It exercises the button contract against the simulated Telegram server; it does not contact a live Bot. Run it after building with `test-support`.
 
 Native `tbg-gateway` reads `~/.config/tbg/server.yaml`. Without `data_dir`, it stores data in `~/.local/share/tbg`. Server configuration changes require restart; each CLI invocation reloads Client configuration. Implementation plans and capability boundaries are tracked in [Issue #7](https://github.com/JoverZhang/telegram-bot-gateway/issues/7).

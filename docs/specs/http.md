@@ -16,7 +16,7 @@ Use `POST http://<host>:<port>/v1/<command-path>` throughout, with `application/
 | Options with values | Remove `--` and replace `-` in the name with `_`; for example, `--quote <msg_id>` → `quote`. |
 | Flags without values | Send `true` when present; `false` is equivalent to omitting the flag. |
 
-The request body is one JSON object. Supply strings, integers, and booleans according to the CLI parameter types. Omitted optional parameters retain CLI behavior. Empty strings and null are not treated as omissions, and types or content are not corrected automatically. HTTP accepts only the business commands and parameters defined in the overview.
+The request body is one JSON object. Supply strings, integers, booleans, and objects according to the CLI parameter types. Omitted optional parameters retain CLI behavior. Empty strings and null are not treated as omissions, and types or content are not corrected automatically. HTTP accepts only the business commands and parameters defined in the overview.
 
 These two examples show command hierarchy and parameter mapping. JSON is formatted for readability:
 
@@ -36,6 +36,33 @@ $ tbg --agent hopeful_morse send <topic> "@calm_turing Please review the result"
   "quote": "m42"
 }
 ```
+
+## Button and edit requests
+
+`reply_markup` is a native JSON object in HTTP, not a JSON-encoded string. The CLI parses the JSON argument before sending it. For example:
+
+```json
+{
+  "agent": "hopeful_morse",
+  "topic": "<topic>",
+  "content": "Page 1 of 2: A, B",
+  "reply_markup": {
+    "inline_keyboard": [[{"text": "Next", "callback_data": "pg_7f2a"}]]
+  }
+}
+```
+
+Send this body to `POST /v1/send`. The following paths use the same mapping and require `agent`:
+
+| Path | Other required fields | Optional fields | Success result |
+|---|---|---|---|
+| `/v1/send` | `topic`, `content` | `quote`, `format`, `no_header`, `reply_markup` | `{"msg_id":"m42"}` |
+| `/v1/callback/list` | None | `topic`, `cursor`, `limit` | `{"callbacks":[...],"next_cursor":"cq-73","remaining_count":0}` |
+| `/v1/callback/answer` | `callback_query_id` | `text`, `show_alert` | `{"callback_query_id":"cq-73"}` |
+| `/v1/edit/text` | `topic`, `msg_id`, `content` | `format`, `no_header`, `reply_markup` | `{"msg_id":"m42"}` |
+| `/v1/edit/markup` | `topic`, `msg_id`, `reply_markup` | None | `{"msg_id":"m42"}` |
+
+`cursor` in callback requests is a `callback_query_id`, not a conversation `msg_id`. Text edits preserve the stored keyboard when `reply_markup` is omitted; `{"inline_keyboard":[]}` clears it. Do not send null to express either operation. Callback answers and edits are synchronous Telegram operations without durable retries. See the [button contract](buttons.md) for validation, callback fields, ownership, readiness, and ambiguous outcomes.
 
 ## Responses
 
@@ -57,4 +84,4 @@ A wait keeps one HTTP request open until an ending condition from the communicat
 
 If the client cancels the request or the connection is interrupted, the Gateway ends that wait when it detects the disconnected request, freeing the Agent's wait slot without acknowledging messages. Other commands retain their own execution rules.
 
-HTTP requests require no authentication or access token. Any caller that can reach the Gateway can register an Agent and select a registered identity through `agent`. Telegram User trust still follows the operations specification.
+HTTP requests require no authentication or access token. Any caller that can reach the Gateway can register an Agent and select a registered identity through `agent`. Telegram User trust still follows the operations specification. Agent ownership checks are routing protection, not authentication; keep this interface local or on a private, controlled network.

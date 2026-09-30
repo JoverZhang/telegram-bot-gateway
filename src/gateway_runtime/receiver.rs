@@ -27,6 +27,7 @@ pub(super) async fn run(
                     })
                     .await
                     .map_err(|e| e.to_string())?;
+                    g.mark_telegram_ready();
                     initialized = true;
                     let _ = ready.send(true);
                 }

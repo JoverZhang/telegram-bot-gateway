@@ -91,6 +91,8 @@ pub enum Delivery {
         text: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         parse_mode: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        reply_markup: Option<crate::contract::InlineKeyboardMarkup>,
         thread: Option<i64>,
         quote: Option<i64>,
     },

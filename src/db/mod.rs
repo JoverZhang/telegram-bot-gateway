@@ -1,3 +1,4 @@
+mod buttons;
 mod queries;
 use crate::model::{Error, Result};
 pub(crate) use queries::Tx;
@@ -17,7 +18,7 @@ impl Database {
             "PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA foreign_keys=ON;",
         )?;
         let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
-        if version > 1 {
+        if version > 2 {
             return Err(Error::internal(
                 "database schema is newer than this Gateway",
             ));
@@ -25,6 +26,11 @@ impl Database {
         if version == 0 {
             let t = conn.transaction()?;
             t.execute_batch(include_str!("../../migrations/0001_initial.sql"))?;
+            t.commit()?;
+        }
+        if version < 2 {
+            let t = conn.transaction()?;
+            t.execute_batch(include_str!("../../migrations/0002_buttons.sql"))?;
             t.commit()?;
         }
         conn.execute(

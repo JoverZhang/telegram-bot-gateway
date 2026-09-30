@@ -4,7 +4,7 @@
 
 为 Agent 提供持久化的 Telegram Topic 通信。`tbg` 通过 HTTP 发送和读取消息；Gateway 用 SQLite 保存对话、独立订阅和确认进度，User 通过 Telegram 参与。
 
-首条端到端链路已实现：管理员初始化、Group 接入、Agent 注册、Topic 创建/关闭/重开、发送、订阅、unread/history、wait、ack 和 Bot ❤️ 回执。目前 `/manage` 用于接入 Group 并显示操作范围。完整按钮菜单、普通 User 信任管理、Doctor 页面和持久化语言偏好仍待实现。当前请将参与通信的 User 配置为管理员，不要通过修改数据库授予信任。
+首条端到端链路已实现：管理员初始化、Group 接入、Agent 注册、Topic 创建/关闭/重开、发送、订阅、unread/history、wait、ack 和 Bot ❤️ 回执。目前 `/manage` 用于接入 Group 并显示操作范围。完整管理按钮菜单、普通 User 信任管理、Doctor 页面和持久化语言偏好仍待实现。当前请将参与通信的 User 配置为管理员，不要通过修改数据库授予信任。
 
 ## 在 Linux PC 上运行
 
@@ -56,6 +56,12 @@ send 成功表示消息和投递任务已在本地提交。后台投递支持重
 
 出站文本连同 Agent 标头超过 4096 个 UTF-16 单元时，在接收前报错。Telegram 非文本消息保留 `[类型]` 标记、caption 和已接收的 update 内容（嵌套回复仅保留平台引用），暂不下载附件。general/default Topic 预留。未信任 User 的普通消息被忽略；允许的管理交互独立保存，不进入对话历史。
 
+应用按钮接口见[内联键盘与编辑契约](docs/specs/buttons.zh-CN.md)，包括 `send --reply-markup`、独立回调轮询与回答，以及编辑 Agent 自己已投递的消息。页面内容在 Topic 中共享，应用须核实点击者和会话权限。
+
+### 按钮版本的数据库升级
+
+按钮版本在启动时将 SQLite schema 1 升级为 schema 2，新增键盘与回调表。使用新二进制或镜像重启前，须停止 Gateway 并备份完整数据目录。既有对话、投递和 ack 状态保留。升级后需要支持 schema 2 的 Gateway，旧版本会拒绝打开数据库。回滚须恢复升级前的备份，备份后的写入会丢失。
+
 ## 任务结束通知
 
 使用[可安装的 Codex 插件](integrations/codex/README.zh-CN.md)接收主会话每轮结束通知，复用 Session 身份，并进行安装、状态检查、测试和卸载。试运行期间保留已有 Hooks。
@@ -78,10 +84,13 @@ cargo fmt --check
 cargo clippy --locked --all-targets --features test-support -- -D warnings
 cargo build --locked --features test-support
 python3 tests/e2e.py
+python3 tests/buttons_e2e.py
 docker build -t telegram-bot-gateway .
 python3 tests/container_smoke.py --image telegram-bot-gateway
 ```
 
 E2E 使用真实 CLI/Gateway 进程、HTTP 和 SQLite，对接可控制故障的 Telegram HTTP 替身，覆盖独立消费、游标、@/静音规则、wait 取消、接入、重启恢复、429、发送响应丢失和回执被拒绝。`target/e2e/` 保存报告、日志和测试数据库。这些是模拟集成结果，尚未验证真实 Telegram。`test-support` 仅用于测试配置和 API 地址覆盖，容器构建不启用该 feature。
+
+按钮 E2E 命令将报告、日志和数据库写入 `target/buttons-e2e/`，通过 Telegram HTTP 替身验证按钮接口，不连接真实 Bot。运行前须先以 `test-support` 构建。
 
 原生 `tbg-gateway` 读取 `~/.config/tbg/server.yaml`，未指定 `data_dir` 时使用 `~/.local/share/tbg`。Server 修改配置后手动重启；CLI 每次调用重新读取 Client 配置。实现计划和能力边界记录在 [Issue #7](https://github.com/JoverZhang/telegram-bot-gateway/issues/7)。

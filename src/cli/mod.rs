@@ -12,7 +12,9 @@ struct Args {
 }
 pub async fn run() -> std::result::Result<(), String> {
     let mut a = Args::parse();
-    if let crate::contract::Command::Send { content, .. } = &mut a.command
+    if let crate::contract::Command::Send { content, .. }
+    | crate::contract::Command::Edit(crate::contract::Edit::Text { content, .. }) =
+        &mut a.command
         && content == "-"
     {
         use std::io::Read;

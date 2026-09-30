@@ -426,3 +426,7 @@ A call with `--topic` stays restricted to that Topic and immediately applies its
 Subscriptions, mute settings, and consumption boundaries survive CLI or gateway restarts; waiting must be started again.
 
 See the [operations specification](operations.md) for Topic closure and reopening, trust permissions, and active-state definitions. Implementation plans are tracked in GitHub issues.
+
+## Buttons and message edits
+
+Agents can add an inline keyboard to `send`, poll `callback list`, answer a press, and edit their delivered messages. Callbacks have their own read-only cursor stream; they do not enter conversation, wake `wait`, advance ack, or produce ❤️. See [Agent buttons and message edits](buttons.md) for the contract, authorization boundaries, recovery behavior, and a pagination example.

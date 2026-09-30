@@ -3,7 +3,7 @@ use crate::model::{GroupInfo, Sender, Subscription, TopicInfo};
 use rusqlite::{Connection, OptionalExtension, params};
 use serde_json::{Value, json};
 pub(crate) struct Tx<'a> {
-    c: &'a Connection,
+    pub(super) c: &'a Connection,
 }
 impl<'a> Tx<'a> {
     pub(super) fn new(c: &'a Connection) -> Self {

@@ -1,4 +1,6 @@
+mod buttons;
 mod responses;
+pub use buttons::*;
 use clap::Subcommand;
 pub use responses::*;
 use serde::{Deserialize, Serialize};
@@ -25,6 +27,10 @@ pub enum Command {
     Group(Group),
     #[command(subcommand)]
     Topic(Topic),
+    #[command(subcommand)]
+    Edit(Edit),
+    #[command(subcommand)]
+    Callback(Callback),
     Send {
         topic: String,
         /// Message text, or - to read UTF-8 content from stdin (CLI only).
@@ -38,6 +44,9 @@ pub enum Command {
         #[arg(long)]
         #[serde(default, skip_serializing_if = "is_false")]
         no_header: bool,
+        /// InlineKeyboardMarkup JSON with callback_data or URL buttons.
+        #[arg(long)]
+        reply_markup: Option<InlineKeyboardMarkup>,
     },
     Unread {
         topic: String,
@@ -134,13 +143,39 @@ impl Request {
             return Err("agent is required".into());
         }
         match &request.command {
-            Command::Unread { limit: Some(0), .. } | Command::History { limit: Some(0), .. } => {
+            Command::Unread { limit: Some(0), .. }
+            | Command::History { limit: Some(0), .. }
+            | Command::Callback(Callback::List { limit: Some(0), .. }) => {
                 return Err("limit must be positive".into());
             }
             Command::Wait {
                 timeout: Some(timeout),
                 ..
             } if *timeout > i64::MAX as u64 / 1000 => return Err("timeout is too large".into()),
+            Command::Send {
+                reply_markup: Some(markup),
+                ..
+            }
+            | Command::Edit(Edit::Text {
+                reply_markup: Some(markup),
+                ..
+            })
+            | Command::Edit(Edit::Markup {
+                reply_markup: markup,
+                ..
+            }) => markup.validate()?,
+            Command::Callback(Callback::Answer {
+                callback_query_id,
+                text,
+                ..
+            }) => {
+                if callback_query_id.is_empty() {
+                    return Err("callback_query_id must not be empty".into());
+                }
+                if text.as_ref().is_some_and(|text| text.chars().count() > 200) {
+                    return Err("callback answer text must not exceed 200 characters".into());
+                }
+            }
             _ => (),
         }
         Ok(request)
@@ -163,12 +198,15 @@ impl Request {
         // Unit variants serialize as strings; struct variants as one-key objects.
         let mut parts = route.split('/').rev();
         let leaf = parts.next().ok_or("missing command")?;
-        let payload =
-            if body.is_empty() && !matches!(route, "agent/register" | "topic/list" | "wait") {
-                Value::String(leaf.into())
-            } else {
-                json!({leaf: body})
-            };
+        let payload = if body.is_empty()
+            && !matches!(
+                route,
+                "agent/register" | "topic/list" | "callback/list" | "wait"
+            ) {
+            Value::String(leaf.into())
+        } else {
+            json!({leaf: body})
+        };
         let value = parts.fold(payload, |value, parent| json!({parent:value}));
         let command =
             serde_json::from_value(value).map_err(|error| format!("invalid command: {error}"))?;
@@ -177,7 +215,10 @@ impl Request {
     pub fn wire(&self) -> (String, Value) {
         let value = serde_json::to_value(&self.command).expect("command serialization");
         let (first, value) = untag(value);
-        let (route, mut body) = if matches!(first.as_str(), "agent" | "topic" | "group") {
+        let (route, mut body) = if matches!(
+            first.as_str(),
+            "agent" | "topic" | "group" | "edit" | "callback"
+        ) {
             let (second, body) = untag(value);
             (format!("{first}/{second}"), body)
         } else {

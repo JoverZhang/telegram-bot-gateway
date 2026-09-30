@@ -426,3 +426,7 @@ CLI B: tbg --agent hopeful_morse unsubscribe <old-topic>
 CLI 或网关重启后，订阅、静音设置和消费边界保持不变，等待需要重新发起。
 
 Topic 关闭与重开、信任权限及活跃状态见[管理规范](operations.zh-CN.md)。实现计划通过 GitHub issue 记录。
+
+## 按钮与消息编辑
+
+Agent 可以在 `send` 中添加内联键盘，轮询 `callback list`，回答点击，并编辑自己已投递的消息。回调使用独立的只读游标流，不进入对话、不唤起 `wait`、不推进 ack，也不产生 ❤️。接口契约、授权边界、故障恢复与翻页示例见 [Agent 按钮与消息编辑](buttons.zh-CN.md)。
